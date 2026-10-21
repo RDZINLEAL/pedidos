@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Painel — Pedidos</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header><h1>Painel de Pedidos</h1></header>
+  <main>
+    <section>
+      <h2>Novo pedido</h2>
+      <form id="order-form" enctype="multipart/form-data">
+        <!-- Dados do Cliente -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <label>Nome do cliente<input name="client_name" required></label>
+          <label>E-mail<input name="client_email" type="email" required></label>
+          <label>CPF/CNPJ (só números)<input name="client_document" required></label>
+          <label>Telefone (com DDD)<input name="client_phone" required></label>
+        </div>
+
+        <!-- Foto Geral do Pedido -->
+        <label>Foto principal do pedido (Opcional)<input name="photo" type="file" accept="image/*"></label>
+
+        <hr style="margin: 20px 0; border: 0; border-top: 1px solid #ddd;">
+
+        <!-- Itens do Pedido -->
+        <h3 style="font-size: 14px; margin-bottom: 10px;">Itens do Pedido</h3>
+        <div id="items-container">
+          <!-- As linhas de itens vão aparecer aqui -->
+        </div>
+        <button type="button" onclick="add_item()" style="background: #555; margin-bottom: 15px;">+ Adicionar outro item</button>
+
+        <div style="font-size: 18px; font-weight: bold; margin-bottom: 20px;">
+          Total do Pedido: <span id="total-display" style="color: #1f7a2e;">R$ 0,00</span>
+        </div>
+
+        <button type="submit">Criar pedido e gerar link</button>
+      </form>
+      <p id="result"></p>
+    </section>
+
+    <section>
+      <h2>Pedidos Recentes</h2>
+      <table>
+        <thead><tr><th>ID</th><th>Cliente</th><th>Total</th><th>Status</th><th>Ação</th><th>Foto</th></tr></thead>
+        <tbody id="orders-body"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script>
+    // Função para adicionar uma nova linha de produto
+    function add_item(desc = '', qty = 1, price = '') {
+      const container = document.getElementById('items-container');
+      const row = document.createElement('div');
+      row.className = 'item-row';
+      row.style = 'display: flex; gap: 10px; margin-bottom: 10px; align-items: center;';
+      
+      row.innerHTML = `
+        <input type="text" class="item-desc" placeholder="Ex: Camiseta Preta P" value="${desc}" required style="flex: 1;">
+        <input type="number" class="item-qty" placeholder="Qtd" value="${qty}" min="1" required style="width: 60px;">
+        <input type="number" class="item-price" placeholder="Valor (R$)" value="${price}" step="0.01" min="0.01" required style="width: 100px;">
+        <button type="button" onclick="this.parentElement.remove(); calc_total();" style="background: #d33;">X</button>
+      `;
+      container.appendChild(row);
+
+      // Adiciona o evento para recalcular o total sempre que o valor ou a quantidade mudar
+      row.querySelector('.item-qty').addEventListener('input', calc_total);
+      row.querySelector('.item-price').addEventListener('input', calc_total);
+      calc_total();
+    }
+
+    // Calcula o valor total do pedido
+    function calc_total() {
+      let total = 0;
+      const rows = document.querySelectorAll('.item-row');
+      rows.forEach(row => {
+        const qty = parseInt(row.querySelector('.item-qty').value) || 0;
+        const price = parseFloat(row.querySelector('.item-price').value) || 0;
+        total += (qty * price);
+      });
+      document.getElementById('total-display').textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
+    }
+
+    // Inicia o formulário com um item em branco
+    add_item();
+
+    async function load_orders() {
+      const res = await fetch('/api/admin/orders');
+      const { orders } = await res.json();
+      const tbody = document.getElementById('orders-body');
+      tbody.innerHTML = '';
+      for (const o of orders) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><code>${o.id.slice(0,8)}</code></td>
+          <td>${o.client_name}<br><small>${o.client_email}</small></td>
+          <td>R$ ${(o.total_cents/100).toFixed(2)}</td>
+          <td><span class="status status-${o.status}">${o.status}</span></td>
+          <td><a href="/order/${o.id}" target="_blank" rel="noopener">Abrir PIX</a></td>
+          <td>${o.photo_path ? `<img src="${o.photo_path}" width="50">` : '—'}</td>`;
+        tbody.appendChild(tr);
+      }
+    }
+
+    document.getElementById('order-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const data = new FormData(form);
+      
+      // Coletar os itens e transformar em JSON
+      const items = [];
+      document.querySelectorAll('.item-row').forEach(row => {
+        const desc = row.querySelector('.item-desc').value;
+        const qty = parseInt(row.querySelector('.item-qty').value);
+        const price = parseFloat(row.querySelector('.item-price').value);
+        items.push({
+          description: desc,
+          quantity: qty,
+          unit_price_cents: Math.round(price * 100)
+        });
+      });
+      
+      data.append('items', JSON.stringify(items));
+
+      const res = await fetch('/api/admin/orders', { method: 'POST', body: data });
+      const json = await res.json();
+      const out = document.getElementById('result');
+      
+      if (!res.ok) { 
+        out.textContent = 'Erro: ' + json.error; 
+        return; 
+      }
+      
+      out.innerHTML = json.order.payment_link
+        ? `Pedido criado. <a href="/order/${json.order.id}" target="_blank">Abrir a página do PIX aqui</a>`
+        : `Pedido criado, mas a Invictus não devolveu o PIX. Verifique o painel preto.`;
+        
+      form.reset();
+      document.getElementById('items-container').innerHTML = '';
+      add_item(); // Coloca uma linha em branco de volta
+      load_orders();
+    });
+
+    load_orders();
+  </script>
+</body>
+</html>

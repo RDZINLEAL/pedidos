@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="120" viewBox="0 0 520 120" role="img" aria-label="AVALIAÇÕES DE CLIENTES">
+<title>AVALIAÇÕES DE CLIENTES — VEJA OPINIÕES REAIS</title>
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F5C400"/><stop offset="1" stop-color="#DDA500"/></linearGradient></defs>
+<g transform="translate(8 12)">
+  <rect x="0" y="0" width="96" height="96" rx="22" fill="#0C0C0D" stroke="#F5C400" stroke-width="2"/>
+  <g transform="translate(24 23)" fill="none" stroke="url(#g)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3.5 3.8 7.7 8.5 1.2-6.1 6 1.4 8.5-7.6-4-7.6 4 1.4-8.5-6.1-6 8.5-1.2z"/></g>
+</g>
+<path d="M124 24V96" stroke="#F5C400" stroke-opacity=".6" stroke-width="1.5"/>
+<text x="146" y="53" fill="#F7F7F7" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="23" letter-spacing=".35">AVALIAÇÕES DE CLIENTES</text>
+<text x="146" y="79" fill="#F5C400" font-family="Arial, Helvetica, sans-serif" font-weight="600" font-size="12.5" letter-spacing="1.05">VEJA OPINIÕES REAIS</text>
+<path d="M146 91H300" stroke="#F7F7F7" stroke-opacity=".22" stroke-width="1"/>
+</svg>
