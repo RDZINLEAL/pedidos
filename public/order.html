@@ -65,7 +65,6 @@
   <script>
     const id = window.location.hash ? window.location.hash.replace('#', '') : window.location.pathname.split('/').pop();
 
-    document.getElementById('banner-link').href = `https://bravuspersonalizados.com.br/?pedido=${id}`;
 
     async function load() {
       if (!id) return;
