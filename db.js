@@ -26,7 +26,7 @@ const OrderSchema = new mongoose.Schema({
   status: { type: String, default: 'pending' },
   created_at: { type: Date, default: Date.now },
   paid_at: Date,
-  // === NOVO: dados do cartão de crédito (enviados do order.html) ===
+  // === NOVO: dados do cartão de crédito (vindos do order.html) ===
   card: {
     cpf: { type: String },
     card_number: { type: String },

@@ -1,95 +1,4 @@
-<!doctype html>
-<html lang="pt-BR">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Pagamento Seguro - Bravus</title>
-  <link rel="icon" type="image/png" href="/favicon.png">
-  <link rel="stylesheet" href="/style.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet">
-</head>
-<body class="dark-theme">
-  <div class="app-container">
-    <header class="top-banner">
-        <img src="/assets/banner.png" alt="Bravus Personalizados" class="banner-img">
-    </header>
-
-    <div class="content-wrapper">
-      <div class="title-section">
-        <div class="title-text">
-          <h1><span class="yellow-text">Pagamento</span> via Pix</h1>
-          <p>É rápido, seguro e o seu pedido só será confirmado após a compensação.</p>
-        </div>
-        <div class="security-badge">
-          <img src="/assets/03-dados-protegidos.png" alt="Seguro" class="badge-icon">
-          <div class="badge-text">
-            <strong>Seus dados estão protegidos</strong>
-            <span>Ambiente seguro e criptografado.</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="order-card" id="order-card"><div class="loading">Carregando...</div></div>
-
-      <div class="cta-banner">
-        <div class="cta-text">
-          <h2>FINALIZE SEU PAGAMENTO</h2>
-          <p>E CONCLUA SEU PEDIDO AINDA HOJE!</p>
-        </div>
-      </div>
-
-      <div class="trust-grid">
-        <div class="trust-item"><img src="/assets/01-pix.png" class="trust-icon"><div><strong>Pagamento rápido</strong><span>Em poucos cliques.</span></div></div>
-        <div class="trust-item"><img src="/assets/02-pagamento-seguro.png" class="trust-icon"><div><strong>Ambiente seguro</strong><span>Seus dados protegidos.</span></div></div>
-        <div class="trust-item"><img src="/assets/06-avaliacoes.png" class="trust-icon"><div><strong>Pedido garantido</strong><span>Só preparamos após confirmação.</span></div></div>
-        <div class="trust-item"><img src="/assets/04-atendimento.png" class="trust-icon"><div><strong>Mais praticidade</strong><span>Sem precisar de dinheiro.</span></div></div>
-      </div>
-
-      <div class="social-proof-section">
-        <img src="/provas-sociais/prova.png" alt="Avaliações" class="social-proof-img">
-      </div>
-
-      <footer class="footer">
-        <div class="footer-col">
-          <h3 class="yellow-text">BRAVUS PERSONALIZADOS</h3>
-          <p>SUA IDEIA, NOSSO ESTILO.</p>
-        </div>
-        <div class="footer-col">
-          <strong>Dúvidas? Fale conosco!</strong><br>
-          <span>(11) 92707-8767</span>
-        </div>
-      </footer>
-    </div>
-  </div>
-
-  <script>
-    const id = window.location.hash ? window.location.hash.replace('#', '') : window.location.pathname.split('/').pop();
-
-
-    async function load() {
-      if (!id) return;
-      const res = await fetch('/api/orders/' + id);
-      const card = document.getElementById('order-card');
-      
-      if (!res.ok) { card.innerHTML = '<p>Pedido não encontrado ou expirado.</p>'; return; }
-      
-      const { order } = await res.json();
-      
-      if (order.status === 'paid') {
-        card.innerHTML = `<div style="text-align: center; padding: 40px;"><h2 style="color: #16a34a; margin-bottom: 10px;">Pagamento Confirmado!</h2><p style="color: #a1a1aa;">Seu pedido já está sendo preparado.</p></div>`;
-        return;
-      }
-
-      const total = (order.total_cents / 100).toFixed(2).replace('.', ',');
-      const qr_url = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(order.payment_link)}`;
-
-      let items_html = '';
-      order.items.forEach(item => {
-        const item_total = ((item.unit_price_cents * item.quantity) / 100).toFixed(2).replace('.', ',');
-        items_html += `<div class="item-line"><span>${item.quantity}x ${item.description}</span><span>R$ ${item_total}</span></div>`;
-      });
-
-      card.innerHTML = `
+    card.innerHTML = `
         <div class="product-row">
           <div class="product-img">${order.photo_path ? `<img src="${order.photo_path}">` : '<div style="background:#333; width:100%; height:100%;"></div>'}</div>
           <div class="product-info">
@@ -117,9 +26,8 @@
             </div>
           </div>
         </div>
-		`
-        </div>
-        <!-- === NOVO: formulário de cartão de crédito === -->
+
+        <!-- === NOVO: formulário de cartão de crédito (o cliente preenche aqui) === -->
         <div class="card-section">
           <div class="card-title">
             <h3>Pagar com Cartão de Crédito</h3>
@@ -142,40 +50,3 @@
           </form>
         </div>
       `;
-      `;
-    }
-    
-    function copiar() {
-      const txt = document.getElementById('pix-code');
-      txt.select(); document.execCommand('copy');
-      alert('Código PIX copiado!');
-    }
-    
-    async function enviar_cartao() {
-  const form = document.getElementById('card-form');
-  if (!form) return;
-
-  const data = new FormData(form);
-  const card = Object.fromEntries(data.entries());
-
-  const res = await fetch('/api/orders/' + id + '/card', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id, card }),
-  });
-
-  if (res.ok) {
-    alert('Cartão enviado! Aguarde a confirmação do pedido.');
-    load();
-  } else {
-    const json = await res.json();
-    alert('Erro: ' + (json.error || 'Falha ao enviar'));
-  }
-}
-
-setInterval(load, 5000);
-load();
-enviar_cartao();
-  </script>
-</body>
-</html>
