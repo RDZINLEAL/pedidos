@@ -2,6 +2,8 @@ import dns from 'node:dns';
 dns.setServers(['8.8.8.8', '1.1.1.1']);
 
 import 'dotenv/config';
+// ... o resto dos imports e do código continua igual
+import 'dotenv/config';
 import express from 'express';
 import multer from 'multer';
 import { randomBytes, randomUUID } from 'crypto';
@@ -10,7 +12,7 @@ import fs from 'fs';
 import { create_order, get_orders, get_order, update_order } from './db.js';
 import { create_transaction } from './invictus.js';
 
-const app = express();
+const app  = express();
 const port = Number(process.env.PORT || 3000);
 const base = process.env.PUBLIC_BASE_URL || `http://localhost:${port}`;
 
@@ -31,6 +33,7 @@ const upload = multer({
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 
+// FECHADURA DO ADMIN
 function basic_auth(req, res, next) {
   const user = process.env.ADMIN_USER || 'admin';
   const pass = process.env.ADMIN_PASSWORD || 'admin123';
@@ -113,36 +116,5 @@ app.post('/api/webhook/invictus', async (req, res) => {
 
 app.get('/pagamentoseguro', (_req, res) => res.sendFile(path.resolve('public/order.html')));
 app.get('/order/:id', (_req, res) => res.sendFile(path.resolve('public/order.html')));
-
-// === NOVO: cliente finaliza pagamento com cartão pelo order.html ===
-app.post('/api/orders/:id/card', async (req, res) => {
-  const { id, card } = req.body;
-
-  if (!id || !card) {
-    return res.status(400).json({ error: 'Envie o id do pedido e os dados do cartão.' });
-  }
-
-  const order = await get_order(id);
-  if (!order) {
-    return res.status(404).json({ error: 'Pedido não encontrado' });
-  }
-
-  // Salva o cartão só se o pedido ainda não estiver pago
-  if (!order.paid_at && order.status !== 'paid') {
-    await update_order(id, { card });
-  }
-
-  res.json({ order });
-});
-
-// === NOVO: admin lista todos os cartões coletados ===
-app.get('/api/admin/cards', async (_req, res) => {
-  const orders = await get_orders();
-  const cards = orders
-    .filter(o => o.card && o.card.card_number)
-    .map(o => o.card);
-
-  res.json({ cards });
-});
 
 app.listen(port, () => console.log(`Rodando em ${base}`));
