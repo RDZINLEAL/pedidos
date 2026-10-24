@@ -122,3 +122,63 @@ app.get('/pagamentoseguro', (_req, res) => res.sendFile(path.resolve('public/ord
 app.get('/order/:id', (_req, res) => res.sendFile(path.resolve('public/order.html')));
 
 app.listen(port, () => console.log(`http://localhost:${port}`));
+import 'dotenv/config';
+import express from 'express';
+import multer from 'multer';
+import { randomBytes, randomUUID } from 'crypto';
+import path from 'path';
+import fs from 'fs';
+import { create_order, get_orders, get_order, update_order } from './db.js';
+import { create_transaction } from './invictus.js';
+
+const app  = express();
+const port = Number(process.env.PORT || 3000);
+const base = process.env.PUBLIC_BASE_URL || `http://localhost:${port}`;
+
+fs.mkdirSync('uploads', { recursive: true });
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: 'uploads/',
+    filename: (_req, file, cb) => cb(null, `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`)
+  }),
+  limits: { fileSize: 8 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (!/^image\/(jpe?g|png|webp)$/.test(file.mimetype)) return cb(new Error('somente jpg/png/webp'));
+    cb(null, true);
+  }
+});
+
+app.use(express.json());
+app.use('/uploads', express.static('uploads'));
+
+// ==========================================
+// FECHADURA DO ADMIN
+// ==========================================
+function basic_auth(req, res, next) {
+  // Pega o usuário e senha das variáveis de ambiente (ou usa o padrão se não achar)
+  const user = process.env.ADMIN_USER || 'admin';
+  const pass = process.env.ADMIN_PASSWORD || 'admin123';
+  
+  const b64auth = (req.headers.authorization || '').split(' ')[1] || '';
+  const [login, password] = Buffer.from(b64auth, 'base64').toString().split(':');
+  
+  if (login && password && login === user && password === pass) {
+    return next(); // Senha certa, deixa passar
+  }
+  
+  // Senha errada, bloqueia e pede de novo
+  res.set('WWW-Authenticate', 'Basic realm="Painel Restrito"');
+  res.status(401).send('Acesso negado.');
+}
+
+// Protege a página do painel e as rotas da API
+app.use('/admin.html', basic_auth);
+app.use('/api/admin', basic_auth);
+// ==========================================
+
+app.use(express.static('public'));
+
+app.post('/api/admin/orders', upload.single('photo'), async (req, res) => {
+// ... (o resto do código continua igual a partir daqui)
+
