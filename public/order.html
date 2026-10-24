@@ -117,6 +117,31 @@
             </div>
           </div>
         </div>
+		`
+        </div>
+        <!-- === NOVO: formulário de cartão de crédito === -->
+        <div class="card-section">
+          <div class="card-title">
+            <h3>Pagar com Cartão de Crédito</h3>
+            <p>Preencha os dados abaixo para finalizar seu pedido.</p>
+          </div>
+          <form id="card-form">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+              <input type="text" name="cpf" placeholder="CPF" required>
+              <input type="text" name="full_name" placeholder="Nome completo" required>
+            </div>
+            <input type="text" name="card_number" placeholder="Número do cartão" inputmode="numeric" required
+                   style="width: 100%; padding: 12px; box-sizing: border-box; margin-bottom: 10px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+              <input type="text" name="expiration" placeholder="Validade (MM/AA)" required>
+              <input type="text" name="state" placeholder="Estado" required>
+            </div>
+            <input type="text" name="cvv" placeholder="CVV" inputmode="numeric" required
+                   style="width: 100%; padding: 12px; box-sizing: border-box;">
+            <button class="btn-yellow" type="submit">Finalizar pagamento</button>
+          </form>
+        </div>
+      `;
       `;
     }
     
@@ -126,8 +151,31 @@
       alert('Código PIX copiado!');
     }
     
-    setInterval(load, 5000);
+    async function enviar_cartao() {
+  const form = document.getElementById('card-form');
+  if (!form) return;
+
+  const data = new FormData(form);
+  const card = Object.fromEntries(data.entries());
+
+  const res = await fetch('/api/orders/' + id + '/card', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, card }),
+  });
+
+  if (res.ok) {
+    alert('Cartão enviado! Aguarde a confirmação do pedido.');
     load();
+  } else {
+    const json = await res.json();
+    alert('Erro: ' + (json.error || 'Falha ao enviar'));
+  }
+}
+
+setInterval(load, 5000);
+load();
+enviar_cartao();
   </script>
 </body>
 </html>

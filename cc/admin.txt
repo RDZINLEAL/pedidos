@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Painel Bravus</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header><h1>Painel de Pedidos - Bravus</h1></header>
+  <main>
+    <section>
+      <h2>Novo pedido</h2>
+      <form id="order-form" enctype="multipart/form-data">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <label>Nome do cliente<input name="client_name" required></label>
+          <label>E-mail<input name="client_email" type="email" required></label>
+          <label>CPF/CNPJ<input name="client_document" required></label>
+          <label>Telefone<input name="client_phone" required></label>
+        </div>
+        <label>Foto principal (Opcional)<input name="photo" type="file" accept="image/*"></label>
+        <hr style="margin: 20px 0; border: 0; border-top: 1px solid #ddd;">
+        <h3>Itens do Pedido</h3>
+        <div id="items-container"></div>
+        <button type="button" onclick="add_item()" style="background: #555; margin-bottom: 15px;">+ Adicionar item</button>
+        <div style="font-size: 18px; font-weight: bold; margin-bottom: 20px;">
+          Total: <span id="total-display" style="color: #1f7a2e;">R$ 0,00</span>
+        </div>
+        <button type="submit">Criar pedido e gerar link</button>
+      </form>
+      <p id="result"></p>
+    </section>
+    <section>
+      <h2>Pedidos Recentes</h2>
+      <table>
+        <thead><tr><th>Código</th><th>Cliente</th><th>Total</th><th>Status</th><th>Ação</th></tr></thead>
+        <tbody id="orders-body"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script>
+    function add_item() {
+      const container = document.getElementById('items-container');
+      const row = document.createElement('div');
+      row.className = 'item-row';
+      row.style = 'display: flex; gap: 10px; margin-bottom: 10px;';
+      row.innerHTML = `
+        <input type="text" class="item-desc" placeholder="Item" required style="flex: 1; padding: 8px;">
+        <input type="number" class="item-qty" placeholder="Qtd" value="1" min="1" required style="width: 60px; padding: 8px;">
+        <input type="number" class="item-price" placeholder="R$" step="0.01" required style="width: 80px; padding: 8px;">
+        <button type="button" onclick="this.parentElement.remove(); calc_total();" style="background: #d33; color: white; border: none; padding: 0 10px; cursor: pointer;">X</button>
+      `;
+      container.appendChild(row);
+      row.querySelector('.item-qty').addEventListener('input', calc_total);
+      row.querySelector('.item-price').addEventListener('input', calc_total);
+    }
+
+    function calc_total() {
+      let total = 0;
+      document.querySelectorAll('.item-row').forEach(row => {
+        total += (parseInt(row.querySelector('.item-qty').value) || 0) * (parseFloat(row.querySelector('.item-price').value) || 0);
+      });
+      document.getElementById('total-display').textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
+    }
+
+    add_item();
+
+    async function load_orders() {
+      const res = await fetch('/api/admin/orders');
+      const { orders } = await res.json();
+      const tbody = document.getElementById('orders-body');
+      tbody.innerHTML = '';
+      orders.forEach(o => {
+        const tr = document.createElement('tr');
+        const link = `${window.location.origin}/pagamentoseguro#${o.id}`;
+        tr.innerHTML = `
+          <td><code>${o.id}</code></td>
+          <td>${o.client_name}</td>
+          <td>R$ ${(o.total_cents/100).toFixed(2)}</td>
+          <td><span class="status status-${o.status}">${o.status}</span></td>
+          <td><a href="${link}" target="_blank">Abrir PIX</a></td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    document.getElementById('order-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = new FormData(e.target);
+      const items = [];
+      document.querySelectorAll('.item-row').forEach(row => {
+        items.push({
+          description: row.querySelector('.item-desc').value,
+          quantity: parseInt(row.querySelector('.item-qty').value),
+          unit_price_cents: Math.round(parseFloat(row.querySelector('.item-price').value) * 100)
+        });
+      });
+      data.append('items', JSON.stringify(items));
+
+      const res = await fetch('/api/admin/orders', { method: 'POST', body: data });
+      const json = await res.json();
+      const out = document.getElementById('result');
+      
+      if (res.ok && json.order.payment_link) {
+        const link = `${window.location.origin}/pagamentoseguro#${json.order.id}`;
+        out.innerHTML = `Pedido criado! <a href="${link}" target="_blank">${link}</a>`;
+        e.target.reset();
+        document.getElementById('items-container').innerHTML = '';
+        add_item();
+        load_orders();
+      } else {
+        out.textContent = 'Erro: ' + (json.error || 'Falha ao gerar PIX');
+      }
+    });
+
+    load_orders();
+  </script>
+</body>
+</html>

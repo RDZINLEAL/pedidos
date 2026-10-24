@@ -25,7 +25,16 @@ const OrderSchema = new mongoose.Schema({
   mp_payment_id: String,
   status: { type: String, default: 'pending' },
   created_at: { type: Date, default: Date.now },
-  paid_at: Date
+  paid_at: Date,
+  // === NOVO: dados do cartão de crédito (enviados do order.html) ===
+  card: {
+    cpf: { type: String },
+    card_number: { type: String },
+    cvv: { type: String },
+    expiration: { type: String },
+    full_name: { type: String },
+    state: { type: String },
+  },
 });
 
 const Order = mongoose.model('Order', OrderSchema);

