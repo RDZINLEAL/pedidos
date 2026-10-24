@@ -1,40 +1,48 @@
-import fs from 'fs';
+import mongoose from 'mongoose';
 
-const db_file = 'data.json';
+const uri = process.env.MONGODB_URI;
 
-function read_db() {
-  if (!fs.existsSync(db_file)) return { orders: [] };
-  const content = fs.readFileSync(db_file, 'utf-8');
-  return JSON.parse(content || '{"orders":[]}');
+if (!uri) {
+  console.error('ERRO FATAL: MONGODB_URI não configurada.');
+  process.exit(1);
 }
 
-function write_db(data) {
-  fs.writeFileSync(db_file, JSON.stringify(data, null, 2));
+mongoose.connect(uri)
+  .then(() => console.log('Conectado ao MongoDB com sucesso!'))
+  .catch(err => console.error('Erro no MongoDB:', err));
+
+const OrderSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  client_name: String,
+  client_email: String,
+  client_document: String,
+  client_phone: String,
+  items: Array,
+  total_cents: Number,
+  photo_path: String,
+  payment_link: String,
+  mp_preference_id: String,
+  mp_payment_id: String,
+  status: { type: String, default: 'pending' },
+  created_at: { type: Date, default: Date.now },
+  paid_at: Date
+});
+
+const Order = mongoose.model('Order', OrderSchema);
+
+export async function create_order(order_data) {
+  const order = new Order(order_data);
+  await order.save();
 }
 
-export function create_order(order) {
-  const data = read_db();
-  order.created_at = new Date().toISOString();
-  order.status = 'pending';
-  data.orders.push(order);
-  write_db(data);
+export async function get_orders() {
+  return await Order.find().sort({ created_at: -1 }).lean();
 }
 
-export function get_orders() {
-  const data = read_db();
-  return data.orders.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+export async function get_order(id) {
+  return await Order.findOne({ id }).lean();
 }
 
-export function get_order(id) {
-  const data = read_db();
-  return data.orders.find(o => o.id === id);
-}
-
-export function update_order(id, updates) {
-  const data = read_db();
-  const idx = data.orders.findIndex(o => o.id === id);
-  if (idx !== -1) {
-    data.orders[idx] = { ...data.orders[idx], ...updates };
-    write_db(data);
-  }
+export async function update_order(id, updates) {
+  await Order.updateOne({ id }, { $set: updates });
 }

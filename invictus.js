@@ -4,11 +4,10 @@ export async function create_transaction(order, base_url) {
   const api_key = process.env.INVICTUS_API_KEY;
   if (!api_key) throw new Error('INVICTUS_API_KEY ausente no .env');
 
-  // Monta o array de itens no formato que a Invictus exige
   const api_items = order.items.map(item => ({
     description: item.description,
     quantity: item.quantity,
-    amount: item.unit_price_cents * item.quantity // A Invictus quer o valor total da linha
+    amount: item.unit_price_cents * item.quantity
   }));
 
   const body = {
@@ -42,11 +41,11 @@ export async function create_transaction(order, base_url) {
     throw new Error(`Invictus API ${res.status}: ${json.message || JSON.stringify(json)}`);
   }
 
-  const txData = json.data || json.transaction || json;
+  const txData = json.data || json;
   const pix_code = txData.pix && txData.pix.qr_code ? txData.pix.qr_code : null;
 
   return {
     transaction_id: txData.id,
-    payment_link: pix_code || txData.payment_url || txData.checkout_url || txData.url
+    payment_link: pix_code
   };
 }

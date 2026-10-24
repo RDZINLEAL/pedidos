@@ -1,5 +1,5 @@
 {
-  "name": "pedidos-pagamento",
+  "name": "bravus-pedidos",
   "version": "1.0.0",
   "type": "module",
   "scripts": {
@@ -8,6 +8,7 @@
   "dependencies": {
     "express": "^4.19.2",
     "multer": "^1.4.5-lts.1",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "mongoose": "^8.0.0"
   }
 }

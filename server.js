@@ -20,7 +20,7 @@ const upload = multer({
   }),
   limits: { fileSize: 8 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (!/^image\/(jpe?g|png|webp)$/.test(file.mimetype)) return cb(new Error('somente jpg/png/webp'));
+    if (!/^image\/(jpe?g|png|webp)$/.test(file.mimetype)) return cb(new Error('Apenas imagens'));
     cb(null, true);
   }
 });
@@ -28,19 +28,14 @@ const upload = multer({
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 
-// ==========================================
 // FECHADURA DO ADMIN
-// ==========================================
 function basic_auth(req, res, next) {
   const user = process.env.ADMIN_USER || 'admin';
   const pass = process.env.ADMIN_PASSWORD || 'admin123';
-  
   const b64auth = (req.headers.authorization || '').split(' ')[1] || '';
   const [login, password] = Buffer.from(b64auth, 'base64').toString().split(':');
   
-  if (login && password && login === user && password === pass) {
-    return next();
-  }
+  if (login && password && login === user && password === pass) return next();
   
   res.set('WWW-Authenticate', 'Basic realm="Painel Restrito"');
   res.status(401).send('Acesso negado.');
@@ -48,91 +43,68 @@ function basic_auth(req, res, next) {
 
 app.use('/admin.html', basic_auth);
 app.use('/api/admin', basic_auth);
-// ==========================================
-
 app.use(express.static('public'));
 
 app.post('/api/admin/orders', upload.single('photo'), async (req, res) => {
   try {
     const { client_name, client_email, client_document, client_phone, items } = req.body;
     if (!client_name || !client_email || !client_document || !client_phone || !items) {
-      return res.status(400).json({ error: 'Dados do cliente e itens são obrigatórios' });
+      return res.status(400).json({ error: 'Preencha todos os dados do cliente e itens.' });
     }
     
     const parsed_items = JSON.parse(items);
-    if (parsed_items.length === 0) {
-      return res.status(400).json({ error: 'Adicione pelo menos um item' });
-    }
-
     let total_cents = 0;
-    parsed_items.forEach(item => {
-      total_cents += (item.unit_price_cents * item.quantity);
-    });
+    parsed_items.forEach(item => total_cents += (item.unit_price_cents * item.quantity));
 
     const id = randomBytes(3).toString('hex');
     const photo_path = req.file ? `/uploads/${req.file.filename}` : null;
 
     const new_order = {
-      id,
-      client_name,
-      client_email,
-      client_document,
-      client_phone,
-      items: parsed_items,
-      total_cents,
-      photo_path,
-      payment_link: null,
-      mp_preference_id: null,
-      mp_payment_id: null,
-      paid_at: null
+      id, client_name, client_email, client_document, client_phone, items: parsed_items, total_cents, photo_path,
+      payment_link: null, mp_preference_id: null, mp_payment_id: null, paid_at: null, status: 'pending'
     };
 
-    create_order(new_order);
+    await create_order(new_order);
 
     try {
       const tx = await create_transaction(new_order, base);
-      update_order(id, { mp_preference_id: tx.transaction_id, payment_link: tx.payment_link });
+      await update_order(id, { mp_preference_id: tx.transaction_id, payment_link: tx.payment_link });
     } catch (err) {
-      console.error('[invictus] transação falhou:', err.message);
+      console.error('[invictus] Falha:', err.message);
     }
 
-    const updated = get_order(id);
-    res.json({ order: updated });
+    res.json({ order: await get_order(id) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get('/api/admin/orders', (_req, res) => {
-  res.json({ orders: get_orders() });
+app.get('/api/admin/orders', async (_req, res) => {
+  res.json({ orders: await get_orders() });
 });
 
-app.get('/api/orders/:id', (req, res) => {
-  const order = get_order(req.params.id);
-  if (!order) return res.status(404).json({ error: 'pedido não encontrado' });
+app.get('/api/orders/:id', async (req, res) => {
+  const order = await get_order(req.params.id);
+  if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
   res.json({ order });
 });
 
-app.post('/api/webhook/invictus', (req, res) => {
+app.post('/api/webhook/invictus', async (req, res) => {
   try {
     const { event, transaction } = req.body;
     const order_id = req.query.order_id;
 
     if (order_id && transaction) {
       if (event === 'EVENT:CHARGE_PAID') {
-        update_order(order_id, {
-          status: 'paid',
-          mp_payment_id: transaction.id,
-          paid_at: new Date().toISOString()
-        });
+        await update_order(order_id, { status: 'paid', mp_payment_id: transaction.id, paid_at: new Date().toISOString() });
       } else if (event === 'EVENT:CHARGE_EXPIRED' || event === 'EVENT:CHARGE_REFUND') {
-        update_order(order_id, { status: 'rejected' });
+        await update_order(order_id, { status: 'rejected' });
       }
     }
     res.sendStatus(200);
   } catch (err) {
-    console.error('[webhook invictus]', err);
+    console.error('[webhook]', err);
     res.sendStatus(500);
   }
 });
@@ -140,4 +112,4 @@ app.post('/api/webhook/invictus', (req, res) => {
 app.get('/pagamentoseguro', (_req, res) => res.sendFile(path.resolve('public/order.html')));
 app.get('/order/:id', (_req, res) => res.sendFile(path.resolve('public/order.html')));
 
-app.listen(port, () => console.log(`http://localhost:${port}`));
+app.listen(port, () => console.log(`Rodando em ${base}`));
