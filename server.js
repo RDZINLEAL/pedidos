@@ -1,3 +1,8 @@
+import dns from 'node:dns';
+dns.setServers(['8.8.8.8', '1.1.1.1']);
+
+import 'dotenv/config';
+// ... o resto dos imports e do código continua igual
 import 'dotenv/config';
 import express from 'express';
 import multer from 'multer';
