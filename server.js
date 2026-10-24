@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import multer from 'multer';
-import { randomUUID } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
 import path from 'path';
 import fs from 'fs';
 import { create_order, get_orders, get_order, update_order } from './db.js';
@@ -41,13 +41,13 @@ app.post('/api/admin/orders', upload.single('photo'), async (req, res) => {
       return res.status(400).json({ error: 'Adicione pelo menos um item' });
     }
 
-    // Calcula o total
     let total_cents = 0;
     parsed_items.forEach(item => {
       total_cents += (item.unit_price_cents * item.quantity);
     });
 
-    const id = randomUUID();
+    // Gera um ID curto (ex: a8f3b2) em vez do ID gigante
+    const id = randomBytes(3).toString('hex');
     const photo_path = req.file ? `/uploads/${req.file.filename}` : null;
 
     const new_order = {
@@ -115,6 +115,10 @@ app.post('/api/webhook/invictus', (req, res) => {
   }
 });
 
+// Nova rota bonita
+app.get('/pagamentoseguro', (_req, res) => res.sendFile(path.resolve('public/order.html')));
+
+// Mantém a rota antiga por segurança
 app.get('/order/:id', (_req, res) => res.sendFile(path.resolve('public/order.html')));
 
 app.listen(port, () => console.log(`http://localhost:${port}`));

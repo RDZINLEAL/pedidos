@@ -82,9 +82,25 @@
   </div>
 
   <script>
-    const id = location.pathname.split('/').pop();
+    // Função que lê o ID dependendo de como a URL foi montada
+    function get_order_id() {
+      // Se a URL for /pagamentoseguro#48474
+      if (window.location.hash) {
+        return window.location.hash.replace('#', '');
+      }
+      // Se a URL for /order/48474 (a antiga)
+      const parts = window.location.pathname.split('/');
+      return parts[parts.length - 1];
+    }
+
+    const id = get_order_id();
 
     async function load() {
+      if (!id) {
+        document.getElementById('order-card').innerHTML = '<p>Pedido não encontrado.</p>';
+        return;
+      }
+
       const res = await fetch('/api/orders/' + id);
       const card = document.getElementById('order-card');
       
@@ -107,7 +123,6 @@
       const total = (order.total_cents / 100).toFixed(2).replace('.', ',');
       const qr_url = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(order.payment_link)}`;
 
-      // Monta a lista de itens para mostrar na tela
       let items_html = '';
       if (order.items && order.items.length > 0) {
         order.items.forEach(item => {
