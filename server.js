@@ -2,14 +2,12 @@ import dns from 'node:dns';
 dns.setServers(['8.8.8.8', '1.1.1.1']);
 
 import 'dotenv/config';
-// ... o resto dos imports e do código continua igual
-import 'dotenv/config';
 import express from 'express';
 import multer from 'multer';
 import { randomBytes, randomUUID } from 'crypto';
 import path from 'path';
 import fs from 'fs';
-import { create_order, get_orders, get_order, update_order } from './db.js';
+import { create_order, get_orders, get_order, update_order, delete_all_orders } from './db.js';
 import { create_transaction } from './invictus.js';
 
 const app  = express();
@@ -46,32 +44,18 @@ function basic_auth(req, res, next) {
   res.status(401).send('Acesso negado.');
 }
 
-app.use('/admin.html', basic_auth);
-app.get('/limpar.html', basic_auth, (req, res) => res.sendFile(path.resolve('public/limpar.html')));
-app.use('/api/admin', basic_auth);
-// FECHADURA DO ADMIN
-function basic_auth(req, res, next) {
-  const user = process.env.ADMIN_USER || 'admin';
-  const pass = process.env.ADMIN_PASSWORD || 'admin123';
-  const b64auth = (req.headers.authorization || '').split(' ')[1] || '';
-  const [login, password] = Buffer.from(b64auth, 'base64').toString().split(':');
-  
-  if (login && password && login === user && password === pass) return next();
-  
-  res.set('WWW-Authenticate', 'Basic realm="Painel Restrito"');
-  res.status(401).send('Acesso negado.');
-}
-
 // Protege as rotas
 app.use('/admin.html', basic_auth);
 app.use('/limpar.html', basic_auth);
 app.use('/api/admin', basic_auth);
 
-// ENTREGA OS ARQUIVOS DA PASTA PUBLIC (Essa linha é vital)
-app.use(express.static('public')); 
+// Entrega os arquivos da pasta public
+app.use(express.static('public'));
 
-// Força a entrega do limpar.html
+// Força a entrega do limpar.html (caso o express.static falhe)
 app.get('/limpar.html', basic_auth, (req, res) => res.sendFile(path.resolve('public/limpar.html')));
+
+// API DE CRIAR PEDIDO
 app.post('/api/admin/orders', upload.single('photo'), async (req, res) => {
   try {
     const { client_name, client_email, client_document, client_phone, items } = req.body;
@@ -107,16 +91,29 @@ app.post('/api/admin/orders', upload.single('photo'), async (req, res) => {
   }
 });
 
+// API DE LISTAR PEDIDOS
 app.get('/api/admin/orders', async (_req, res) => {
   res.json({ orders: await get_orders() });
 });
 
+// API DE APAGAR PEDIDOS
+app.delete('/api/admin/orders', async (req, res) => {
+  try {
+    await delete_all_orders();
+    res.json({ success: true, message: 'Todos os pedidos foram apagados.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// API DO CLIENTE
 app.get('/api/orders/:id', async (req, res) => {
   const order = await get_order(req.params.id);
   if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
   res.json({ order });
 });
 
+// WEBHOOK DA INVICTUS
 app.post('/api/webhook/invictus', async (req, res) => {
   try {
     const { event, transaction } = req.body;
@@ -136,6 +133,7 @@ app.post('/api/webhook/invictus', async (req, res) => {
   }
 });
 
+// TELAS
 app.get('/pagamentoseguro', (_req, res) => res.sendFile(path.resolve('public/order.html')));
 app.get('/order/:id', (_req, res) => res.sendFile(path.resolve('public/order.html')));
 
