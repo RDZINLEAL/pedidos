@@ -47,8 +47,8 @@ function basic_auth(req, res, next) {
 }
 
 app.use('/admin.html', basic_auth);
+app.use('/limpar.html', basic_auth); // <--- ADICIONE ESTA LINHA
 app.use('/api/admin', basic_auth);
-app.use(express.static('public'));
 
 app.post('/api/admin/orders', upload.single('photo'), async (req, res) => {
   try {

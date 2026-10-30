@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Manutenção - Bravus</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header><h1>Painel de Manutenção</h1></header>
+  <main>
+    <section>
+      <h2>Zona de Perigo</h2>
+      <p style="color: #555; font-size: 14px; margin-bottom: 20px;">
+        Este painel apaga permanentemente <strong>todos os pedidos</strong> salvos no banco de dados (MongoDB). 
+        Não há como desfazer.
+      </p>
+      <button id="btn-clear" style="background: #d33; color: white; padding: 15px 30px; font-size: 16px; border: none; border-radius: 6px; cursor: pointer;">
+        Apagar Todos os Pedidos
+      </button>
+      <p id="status" style="margin-top: 20px; font-weight: bold;"></p>
+    </section>
+  </main>
+  <script src="/limpar.js"></script>
+</body>
+</html>
