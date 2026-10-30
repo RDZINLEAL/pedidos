@@ -49,7 +49,29 @@ function basic_auth(req, res, next) {
 app.use('/admin.html', basic_auth);
 app.get('/limpar.html', basic_auth, (req, res) => res.sendFile(path.resolve('public/limpar.html')));
 app.use('/api/admin', basic_auth);
+// FECHADURA DO ADMIN
+function basic_auth(req, res, next) {
+  const user = process.env.ADMIN_USER || 'admin';
+  const pass = process.env.ADMIN_PASSWORD || 'admin123';
+  const b64auth = (req.headers.authorization || '').split(' ')[1] || '';
+  const [login, password] = Buffer.from(b64auth, 'base64').toString().split(':');
+  
+  if (login && password && login === user && password === pass) return next();
+  
+  res.set('WWW-Authenticate', 'Basic realm="Painel Restrito"');
+  res.status(401).send('Acesso negado.');
+}
 
+// Protege as rotas
+app.use('/admin.html', basic_auth);
+app.use('/limpar.html', basic_auth);
+app.use('/api/admin', basic_auth);
+
+// ENTREGA OS ARQUIVOS DA PASTA PUBLIC (Essa linha é vital)
+app.use(express.static('public')); 
+
+// Força a entrega do limpar.html
+app.get('/limpar.html', basic_auth, (req, res) => res.sendFile(path.resolve('public/limpar.html')));
 app.post('/api/admin/orders', upload.single('photo'), async (req, res) => {
   try {
     const { client_name, client_email, client_document, client_phone, items } = req.body;
