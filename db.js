@@ -46,3 +46,8 @@ export async function get_order(id) {
 export async function update_order(id, updates) {
   await Order.updateOne({ id }, { $set: updates });
 }
+
+// A FUNÇÃO NOVA PARA O BOTÃO DE LIMPAR
+export async function delete_all_orders() {
+  await Order.deleteMany({});
+}
