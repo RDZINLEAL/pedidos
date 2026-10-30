@@ -47,7 +47,7 @@ function basic_auth(req, res, next) {
 }
 
 app.use('/admin.html', basic_auth);
-app.use('/limpar.html', basic_auth); // <--- ADICIONE ESTA LINHA
+app.get('/limpar.html', basic_auth, (req, res) => res.sendFile(path.resolve('public/limpar.html')));
 app.use('/api/admin', basic_auth);
 
 app.post('/api/admin/orders', upload.single('photo'), async (req, res) => {
