@@ -16,81 +16,123 @@
     </div>
   </header>
 
-  <main class="admin-main">
-    <section class="card">
-      <div class="card-header">
-        <h2>Novo Pedido</h2>
-        <p>Preencha os dados e as quantidades iniciais. O cliente poderá alterar no link.</p>
-      </div>
-      
-      <form id="order-form" enctype="multipart/form-data">
-        <div class="form-grid">
-          <label class="input-group">Nome do Cliente
-            <input name="client_name" placeholder="Ex: João Silva" required>
-          </label>
-          <label class="input-group">E-mail
-            <input name="client_email" type="email" placeholder="joao@email.com" required>
-          </label>
-          <label class="input-group">CPF/CNPJ
-            <input name="client_document" placeholder="Apenas números" required>
-          </label>
-          <label class="input-group">Telefone / WhatsApp
-            <input name="client_phone" placeholder="DDD + Número" required>
-          </label>
-        </div>
-
-        <label class="input-group file-input">
-          Foto Principal da Peça (Capa do Pedido)
-          <input name="photo" type="file" accept="image/*">
-        </label>
-
-        <hr class="divider">
-
-        <div class="section-title">
-          <h3>Categorias e Tamanhos Iniciais</h3>
-          <button type="button" onclick="add_category()" class="btn-secondary">+ Adicionar Categoria</button>
+  <main class="admin-main dashboard-grid">
+    
+    <!-- COLUNA ESQUERDA: FORMULÁRIO E TABELA -->
+    <div class="main-column">
+      <section class="card">
+        <div class="card-header">
+          <h2>Novo Pedido</h2>
+          <p>Preencha os dados e as quantidades iniciais.</p>
         </div>
         
-        <div id="categories-container" class="categories-list"></div>
-
-        <div class="hat-section">
-          <label class="switch-label">
-            <input type="checkbox" id="has_hat" name="has_hat" onchange="toggle_hat()">
-            <span class="slider"></span>
-            Incluir Boné neste pedido?
-          </label>
-          <div id="hat_price_div" class="hat-price-input" style="display:none;">
-            <label class="input-group">Valor do Boné (R$)
-              <input type="number" id="hat_price" name="hat_price" step="0.01" value="35.00">
+        <form id="order-form" enctype="multipart/form-data">
+          <div class="form-grid">
+            <label class="input-group">Nome do Cliente
+              <input name="client_name" placeholder="Ex: João Silva" required>
+            </label>
+            <label class="input-group">E-mail
+              <input name="client_email" type="email" placeholder="joao@email.com" required>
+            </label>
+            <label class="input-group">CPF/CNPJ
+              <input name="client_document" placeholder="Apenas números" required>
+            </label>
+            <label class="input-group">Telefone / WhatsApp
+              <input name="client_phone" placeholder="DDD + Número" required>
             </label>
           </div>
+
+          <label class="input-group file-input">
+            Foto Principal da Peça (Capa do Pedido)
+            <input name="photo" type="file" accept="image/*">
+          </label>
+
+          <hr class="divider">
+
+          <div class="section-title">
+            <h3>Categorias e Tamanhos Iniciais</h3>
+            <button type="button" onclick="add_category()" class="btn-secondary">+ Adicionar Categoria</button>
+          </div>
+          
+          <div id="categories-container" class="categories-list"></div>
+
+          <div class="hat-section">
+            <label class="switch-label">
+              <input type="checkbox" id="has_hat" name="has_hat" onchange="toggle_hat()">
+              <span class="slider"></span>
+              Incluir Boné neste pedido?
+            </label>
+            <div id="hat_price_div" class="hat-price-input" style="display:none;">
+              <label class="input-group">Valor do Boné (R$)
+                <input type="number" id="hat_price" name="hat_price" step="0.01" value="35.00">
+              </label>
+            </div>
+          </div>
+
+          <button type="submit" class="btn-primary">Gerar Link de Personalização</button>
+        </form>
+        <p id="result" class="result-msg"></p>
+      </section>
+
+      <section class="card">
+        <div class="card-header table-header">
+          <h2>Pedidos Recentes</h2>
+          <button type="button" onclick="clear_orders()" class="btn-danger">Apagar Todos</button>
+        </div>
+        
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Cliente</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="orders-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- COLUNA DIREITA: CALCULADORA -->
+    <div class="sidebar-column">
+      <div class="card calc-card">
+        <div class="card-header">
+          <h2>Calculadora Rápida</h2>
+          <p>Faça a conta antes de criar o pedido.</p>
+        </div>
+        
+        <div class="calc-section">
+          <h4>Camisas</h4>
+          <div class="calc-row">
+            <label>Qtd<input type="number" id="calc_shirt_qty" value="0" min="0" oninput="calc_total()"></label>
+            <label>Valor Un. (R$)<input type="number" id="calc_shirt_price" value="0.00" step="0.01" oninput="calc_total()"></label>
+          </div>
+          <div class="calc-result">Total Camisas: <strong id="res_shirt">R$ 0,00</strong></div>
         </div>
 
-        <button type="submit" class="btn-primary">Gerar Link de Personalização</button>
-      </form>
-      <p id="result" class="result-msg"></p>
-    </section>
+        <div class="calc-section" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #27272a;">
+          <h4>Bonés</h4>
+          <div class="calc-row">
+            <label>Qtd<input type="number" id="calc_hat_qty" value="0" min="0" oninput="calc_total()"></label>
+            <label>Valor Un. (R$)<input type="number" id="calc_hat_price" value="0.00" step="0.01" oninput="calc_total()"></label>
+          </div>
+          <div class="calc-result">Total Bonés: <strong id="res_hat">R$ 0,00</strong></div>
+        </div>
 
-    <section class="card">
-      <div class="card-header table-header">
-        <h2>Pedidos Recentes</h2>
-        <button type="button" onclick="clear_orders()" class="btn-danger">Apagar Todos</button>
+        <div class="calc-total">
+          <span>Total Geral</span>
+          <h3 class="yellow-text" id="res_total">R$ 0,00</h3>
+        </div>
+
+        <div class="calc-split">
+          <span>Dividir em 2x</span>
+          <h4 id="res_split">R$ 0,00</h4>
+        </div>
       </div>
-      
-      <div class="table-responsive">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Código</th>
-              <th>Cliente</th>
-              <th>Status</th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody id="orders-body"></tbody>
-        </table>
-      </div>
-    </section>
+    </div>
   </main>
 
   <script>
@@ -99,7 +141,6 @@
     function add_category() {
       const div = document.createElement('div');
       div.className = 'category-setup';
-      
       let sizes_html = '';
       sizes.forEach(sz => {
         sizes_html += `
@@ -109,16 +150,13 @@
           </div>
         `;
       });
-
       div.innerHTML = `
         <div class="cat-top">
           <input type="text" class="cat-name" placeholder="Ex: Gola Polo / Manga Longa" required>
           <input type="number" class="cat-price" placeholder="Preço (R$)" step="0.01" required>
           <button type="button" class="btn-remove" onclick="this.closest('.category-setup').remove()">×</button>
         </div>
-        <div class="cat-sizes">
-          ${sizes_html}
-        </div>
+        <div class="cat-sizes">${sizes_html}</div>
       `;
       document.getElementById('categories-container').appendChild(div);
     }
@@ -126,6 +164,24 @@
 
     function toggle_hat() {
       document.getElementById('hat_price_div').style.display = document.getElementById('has_hat').checked ? 'block' : 'none';
+    }
+
+    // Lógica da Calculadora
+    function calc_total() {
+      const sq = parseFloat(document.getElementById('calc_shirt_qty').value) || 0;
+      const sp = parseFloat(document.getElementById('calc_shirt_price').value) || 0;
+      const hq = parseFloat(document.getElementById('calc_hat_qty').value) || 0;
+      const hp = parseFloat(document.getElementById('calc_hat_price').value) || 0;
+
+      const total_shirt = sq * sp;
+      const total_hat = hq * hp;
+      const total_geral = total_shirt + total_hat;
+      const split = total_geral / 2;
+
+      document.getElementById('res_shirt').textContent = `R$ ${total_shirt.toFixed(2).replace('.', ',')}`;
+      document.getElementById('res_hat').textContent = `R$ ${total_hat.toFixed(2).replace('.', ',')}`;
+      document.getElementById('res_total').textContent = `R$ ${total_geral.toFixed(2).replace('.', ',')}`;
+      document.getElementById('res_split').textContent = `R$ ${split.toFixed(2).replace('.', ',')}`;
     }
 
     async function load_orders() {
@@ -160,14 +216,12 @@
       btn.disabled = true;
 
       const data = new FormData(e.target);
-      
       const cats = [];
       document.querySelectorAll('.category-setup').forEach(block => {
         const init_sizes = {};
         block.querySelectorAll('.init-size').forEach(input => {
           init_sizes[input.dataset.size] = parseInt(input.value) || 0;
         });
-
         cats.push({
           name: block.querySelector('.cat-name').value,
           price_cents: Math.round(parseFloat(block.querySelector('.cat-price').value) * 100),
@@ -177,7 +231,6 @@
       
       data.append('categories', JSON.stringify(cats));
       data.append('has_hat', document.getElementById('has_hat').checked);
-      
       const hatPrice = parseFloat(document.getElementById('hat_price').value);
       data.append('hat_price_cents', Math.round((isNaN(hatPrice) ? 0 : hatPrice) * 100));
 
@@ -189,7 +242,6 @@
         const link = `${window.location.origin}/pagamentoseguro#${json.order.id}`;
         out.innerHTML = `✅ Pedido criado! <br><a href="${link}" target="_blank">${link}</a>`;
         out.style.color = '#22c55e';
-        
         e.target.reset();
         document.getElementById('categories-container').innerHTML = '';
         add_category();
@@ -198,7 +250,6 @@
         out.textContent = '❌ Erro: ' + json.error;
         out.style.color = '#ef4444';
       }
-
       btn.textContent = 'Gerar Link de Personalização';
       btn.disabled = false;
     });
