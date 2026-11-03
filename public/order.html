@@ -11,8 +11,9 @@
 <body class="dark-theme">
   <div class="mobile-container">
     
-    <div class="brand-header">
-      <img src="/assets/banner.png" style="width: 120px; object-fit: contain; margin-bottom: -10px;">
+    <div class="brand-header" style="padding: 10px 0;">
+      <!-- Banner maior e proporcional -->
+      <img src="/assets/banner.png" style="width: 100%; max-width: 320px; object-fit: contain; margin: 0 auto; display: block;">
     </div>
 
     <div class="carousel-container">
@@ -23,6 +24,7 @@
     <p class="subtitle">Selecione os tamanhos para confirmar seu pedido.</p>
     <div class="title-line"></div>
 
+    <!-- Onde as categorias vão aparecer -->
     <div id="categories-wrapper"></div>
     <div id="hat-wrapper" style="display: none;"></div>
 
@@ -68,22 +70,40 @@
 
     async function init() {
       if (!id) return;
-      const res = await fetch('/api/orders/' + id);
-      if (!res.ok) return document.body.innerHTML = '<h1 style="color:white;text-align:center;margin-top:50px;">Pedido não encontrado.</h1>';
-      
-      const { order } = await res.json();
-      if (order.status === 'paid' || order.status === 'pending') return show_payment_screen(order);
-      
-      orderData = order;
-      build_ui(order);
+      try {
+        const res = await fetch('/api/orders/' + id);
+        if (!res.ok) throw new Error('Pedido não encontrado');
+        
+        const { order } = await res.json();
+        
+        // Se já pagou ou já está aguardando o PIX
+        if (order.status === 'paid' || order.status === 'pending') return show_payment_screen(order);
+        
+        orderData = order;
+        build_ui(order);
+      } catch (err) {
+        document.body.innerHTML = `<h1 style="color:white;text-align:center;margin-top:50px;font-family:sans-serif;">${err.message}</h1>`;
+      }
     }
 
     function build_ui(order) {
-      if (order.photo_path) document.getElementById('carousel').innerHTML = `<div class="carousel-slide"><img src="${order.photo_path}"></div>`;
-      
+      // Se a foto existir, mostra
+      if (order.photo_path) {
+        document.getElementById('carousel').innerHTML = `<div class="carousel-slide"><img src="${order.photo_path}"></div>`;
+      }
+
       const wrap = document.getElementById('categories-wrapper');
+      wrap.innerHTML = ''; // Limpa antes de montar
+
+      // A PROTEÇÃO: Se o pedido for velho e não tiver categorias, avisa em vez de quebrar
+      if (!order.available_categories || order.available_categories.length === 0) {
+        wrap.innerHTML = '<div style="text-align:center; padding: 20px; color: #ff4444; font-size: 14px;">Erro: Este pedido foi criado antes da atualização e não tem categorias configuradas. Por favor, crie um novo pedido no painel.</div>';
+        return;
+      }
+      
       order.available_categories.forEach(cat => {
-        selection[cat.name] = { ...cat.initial_sizes }; 
+        // Puxa as quantidades iniciais, se não existirem, começa do zero
+        selection[cat.name] = cat.initial_sizes ? { ...cat.initial_sizes } : { PP:0, P:0, M:0, G:0, GG:0, XG:0 };
         
         const catDiv = document.createElement('div');
         catDiv.className = 'category-block';
@@ -215,35 +235,44 @@
         hat_quantity: hatQty
       };
 
-      const res = await fetch(`/api/orders/${id}/checkout`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      try {
+        const res = await fetch(`/api/orders/${id}/checkout`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
 
-      if (res.ok) {
-        location.reload(); 
-      } else {
-        const errJson = await res.json().catch(() => ({}));
-        alert('Erro ao gerar pagamento: ' + (errJson.error || 'Sem detalhes. Verifique o painel do Render.'));
+        if (res.ok) {
+          location.reload(); 
+        } else {
+          const errJson = await res.json().catch(() => ({}));
+          alert('Erro ao gerar pagamento: ' + (errJson.error || 'Verifique o painel do Render.'));
+          btn.textContent = 'CONFIRMAR PEDIDO';
+          btn.disabled = false;
+        }
+      } catch (err) {
+        alert('Erro de conexão com o servidor.');
         btn.textContent = 'CONFIRMAR PEDIDO';
         btn.disabled = false;
       }
+    }
 
     function show_payment_screen(order) {
       const total = (order.total_cents / 100).toFixed(2).replace('.', ',');
       const qr_url = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(order.payment_link)}`;
       
       let items_html = '';
-      order.selected_sizes.forEach(s => {
-        let qtds = Object.entries(s.sizes).filter(([_, q]) => q > 0).map(([sz, q]) => `${q} ${sz}`).join(', ');
-        if (qtds) items_html += `<div class="item-line"><span>${s.category}</span><span>${qtds}</span></div>`;
-      });
+      if(order.selected_sizes) {
+        order.selected_sizes.forEach(s => {
+          let qtds = Object.entries(s.sizes).filter(([_, q]) => q > 0).map(([sz, q]) => `${q} ${sz}`).join(', ');
+          if (qtds) items_html += `<div class="item-line"><span>${s.category}</span><span>${qtds}</span></div>`;
+        });
+      }
       if (order.hat_quantity > 0) items_html += `<div class="item-line"><span>Boné</span><span>${order.hat_quantity} un</span></div>`;
 
       document.querySelector('.mobile-container').innerHTML = `
         <div style="text-align:center; margin-top:30px;">
-          <img src="/assets/banner.png" style="width:120px;">
+          <img src="/assets/banner.png" style="width:200px;">
         </div>
         <div class="order-card" style="margin-top: 20px; padding: 20px; background: #111; border-radius: 16px;">
           <h2 style="font-size:18px; color:#fff; margin-bottom:15px;">Resumo do Pedido</h2>
@@ -251,8 +280,8 @@
             ${items_html}
           </div>
           
-          <div class="pix-box" style="border:1px solid #facc15; padding:15px; border-radius:16px; text-align:center;">
-             <img src="${qr_url}" style="border-radius:8px; margin-bottom:15px;">
+          <div class="pix-box" style="border:1px solid #facc15; padding:15px; border-radius:16px; text-align:center; background: rgba(0,0,0,0.6); backdrop-filter: blur(5px);">
+             <img src="${qr_url}" style="border-radius:8px; margin-bottom:15px; background: white; padding: 5px;">
              <p style="color:#fff; margin-bottom:10px;">Total: <strong class="yellow-text" style="font-size:24px;">R$ ${total}</strong></p>
              <input type="text" id="pix-code" value="${order.payment_link}" readonly style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px; background:#222; color:#aaa; border:none;">
              <button onclick="navigator.clipboard.writeText('${order.payment_link}'); alert('Copiado!');" style="width:100%; background:#facc15; color:#000; padding:15px; border-radius:8px; font-weight:bold; font-size:16px; border:none; cursor:pointer;">COPIAR CÓDIGO PIX</button>
