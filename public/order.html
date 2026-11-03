@@ -7,6 +7,15 @@
   <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="stylesheet" href="/style.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+  <style>
+    /* Estilos para indicar que o carrossel é arrastável */
+    .carousel-track {
+      cursor: grab;
+    }
+    .carousel-track:active {
+      cursor: grabbing;
+    }
+  </style>
 </head>
 <body class="dark-theme">
   <div class="mobile-container">
@@ -102,6 +111,7 @@
         document.getElementById('carousel').innerHTML = carousel_html;
         if (img_count > 1) {
           document.getElementById('carousel-hint').style.display = 'block';
+          enable_drag_scroll(document.getElementById('carousel')); // Ativa o arrastar com mouse
         }
       }
 
@@ -159,6 +169,32 @@
       }
       
       update_total(); 
+    }
+
+    // FUNÇÃO PARA PERMITIR ARRASTAR O CARROSSEL COM O MOUSE NO PC
+    function enable_drag_scroll(slider) {
+      let isDown = false;
+      let startX;
+      let scrollLeft;
+
+      slider.addEventListener('mousedown', (e) => {
+        isDown = true;
+        startX = e.pageX - slider.offsetLeft;
+        scrollLeft = slider.scrollLeft;
+      });
+      slider.addEventListener('mouseleave', () => {
+        isDown = false;
+      });
+      slider.addEventListener('mouseup', () => {
+        isDown = false;
+      });
+      slider.addEventListener('mousemove', (e) => {
+        if (!isDown) return;
+        e.preventDefault();
+        const x = e.pageX - slider.offsetLeft;
+        const walk = (x - startX) * 2; // Multiplicador da velocidade de arrasto
+        slider.scrollLeft = scrollLeft - walk;
+      });
     }
 
     function attempt_change(cat, size, delta) {
