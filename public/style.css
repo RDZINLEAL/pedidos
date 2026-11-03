@@ -10,11 +10,14 @@ body { font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: anti
    ========================================= */
 .admin-body { background-color: #050505; color: #fff; line-height: 1.5; }
 .admin-header { background-color: #111; border-bottom: 1px solid #27272a; padding: 20px 0; margin-bottom: 30px; }
-.header-content { max-width: 900px; margin: 0 auto; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; }
+.header-content { max-width: 1200px; margin: 0 auto; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; }
 .header-content h1 { font-size: 22px; font-weight: 900; font-style: italic; }
 .header-content .badge { background: #27272a; color: #a1a1aa; font-size: 12px; padding: 4px 10px; border-radius: 99px; font-weight: 600; }
 
-.admin-main { max-width: 900px; margin: 0 auto; padding: 0 20px 60px 20px; }
+.admin-main { max-width: 1200px; margin: 0 auto; padding: 0 20px 60px 20px; }
+.dashboard-grid { display: grid; grid-template-columns: 1fr 320px; gap: 30px; align-items: start; }
+@media (max-width: 900px) { .dashboard-grid { grid-template-columns: 1fr; } }
+
 .card { background: #111; border: 1px solid #27272a; border-radius: 16px; padding: 25px; margin-bottom: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
 .card-header { margin-bottom: 20px; }
 .card-header h2 { font-size: 18px; margin-bottom: 5px; color: #fff; }
@@ -34,10 +37,16 @@ body { font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: anti
 /* Categorias dinâmicas */
 .section-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
 .section-title h3 { font-size: 15px; color: #fff; }
-.cat-row { display: flex; gap: 10px; margin-bottom: 10px; }
-.cat-row input[type="text"] { flex: 2; background: #1a1a1a; border: 1px solid #333; color: #fff; padding: 12px; border-radius: 8px; font-size: 14px; }
-.cat-row input[type="number"] { flex: 1; background: #1a1a1a; border: 1px solid #333; color: #fff; padding: 12px; border-radius: 8px; font-size: 14px; }
-.cat-row input:focus { outline: none; border-color: #facc15; }
+.category-setup { background: #1a1a1a; border: 1px solid #27272a; border-radius: 12px; padding: 15px; margin-bottom: 15px; }
+.cat-top { display: flex; gap: 10px; margin-bottom: 15px; }
+.cat-top input[type="text"] { flex: 2; background: #111; border: 1px solid #333; color: #fff; padding: 10px; border-radius: 6px; font-size: 14px; }
+.cat-top input[type="number"] { flex: 1; background: #111; border: 1px solid #333; color: #fff; padding: 10px; border-radius: 6px; font-size: 14px; }
+.cat-top input:focus { outline: none; border-color: #facc15; }
+.cat-sizes { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+.size-input { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.size-input label { font-size: 12px; font-weight: 700; color: #facc15; }
+.size-input input { width: 100%; background: #111; border: 1px solid #333; color: #fff; text-align: center; padding: 8px; border-radius: 6px; font-weight: bold; }
+.size-input input:focus { outline: none; border-color: #facc15; }
 
 /* Boné */
 .hat-section { background: #1a1a1a; border: 1px dashed #444; border-radius: 8px; padding: 15px; margin: 20px 0; }
@@ -74,36 +83,47 @@ button { font-family: inherit; cursor: pointer; transition: 0.2s; }
 .btn-view:hover { background: #eab308; }
 .result-msg { margin-top: 15px; font-size: 14px; word-break: break-all; }
 
+/* CALCULADORA */
+.calc-card { position: sticky; top: 20px; border: 1px solid #facc15; }
+.calc-section h4 { font-size: 14px; color: #a1a1aa; margin-bottom: 10px; font-weight: 500; }
+.calc-row { display: flex; gap: 10px; }
+.calc-row label { flex: 1; display: flex; flex-direction: column; font-size: 12px; color: #888; gap: 5px; }
+.calc-row input { background: #1a1a1a; border: 1px solid #333; color: #fff; padding: 8px; border-radius: 6px; font-size: 14px; font-weight: bold; }
+.calc-row input:focus { outline: none; border-color: #facc15; }
+.calc-result { font-size: 13px; color: #a1a1aa; margin-top: 10px; display: flex; justify-content: space-between; }
+.calc-result strong { color: #fff; }
+.calc-total { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding-top: 20px; border-top: 1px dashed #333; }
+.calc-total span { font-weight: bold; color: #fff; }
+.calc-total h3 { font-size: 24px; margin: 0; }
+.calc-split { background: #1a1a1a; padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; margin-top: 15px; border: 1px solid #333; }
+.calc-split span { font-size: 13px; color: #a1a1aa; }
+.calc-split h4 { font-size: 18px; margin: 0; color: #e4e4e7; }
+
 /* =========================================
    TELA MOBILE DE PERSONALIZAÇÃO (CLIENTE)
    ========================================= */
 body.dark-theme { 
-  font-family: 'Inter', sans-serif; 
-  color: #fff; 
-  margin: 0; 
-  line-height: 1.5; 
-  -webkit-font-smoothing: antialiased;
-  
-  /* CONFIGURAÇÃO DO FUNDO DESKTOP */
   background-color: #050505;
   background-image: url('/assets/bg-desktop.jpg');
   background-size: cover;
   background-position: center;
   background-attachment: fixed;
   background-repeat: no-repeat;
+  color: #fff; 
+  line-height: 1.5; 
 }
 
-.mobile-container { 
-  max-width: 480px; 
-  margin: 0 auto; 
-  background: transparent; /* Deixa o fundo da imagem aparecer */
-  min-height: 100vh; 
-  padding-bottom: 40px; 
-  position: relative;
+@media (max-width: 768px) {
+  body.dark-theme {
+    background-image: url('/assets/bg-mobile.jpg');
+    background-attachment: scroll;
+  }
 }
+
+.mobile-container { max-width: 480px; margin: 0 auto; background: transparent; min-height: 100vh; padding-bottom: 40px; position: relative; }
 .brand-header { text-align: center; padding: 20px 0; }
 .title-main { text-align: center; font-size: 28px; margin: 10px 0; font-style: italic; font-weight: 900;}
-.subtitle { text-align: center; color: #888; font-size: 13px; margin-bottom: 5px; }
+.subtitle { text-align: center; color: #ccc; font-size: 13px; margin-bottom: 5px; text-shadow: 0 1px 3px rgba(0,0,0,0.8);}
 .title-line { width: 40px; height: 3px; background: #facc15; margin: 0 auto 30px auto; border-radius: 2px;}
 
 .carousel-container { width: 90%; margin: 0 auto 20px auto; border-radius: 16px; overflow: hidden; border: 1px solid #333; background: #111;}
@@ -114,11 +134,11 @@ body.dark-theme {
 .img-placeholder { height: 200px; display: flex; align-items: center; justify-content: center; color: #555; background: #111;}
 
 .category-block { margin-bottom: 20px; padding: 0 15px; }
-.cat-title { font-size: 16px; color: #facc15; margin-bottom: 10px; font-weight: 600;}
+.cat-title { font-size: 16px; color: #facc15; margin-bottom: 10px; font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,0.8);}
 .sizes-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
-.size-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; border: 1px solid #333; border-radius: 12px; background: #0a0a0a; transition: 0.2s; }
-.size-item.active { border-color: #facc15; background: rgba(250, 204, 21, 0.05); }
+.size-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; border: 1px solid #333; border-radius: 12px; background: rgba(10, 10, 10, 0.85); transition: 0.2s; backdrop-filter: blur(5px);}
+.size-item.active { border-color: #facc15; background: rgba(250, 204, 21, 0.15); }
 .size-label { font-weight: 800; font-size: 16px; color: #fff; }
 .size-item.active .size-label { color: #facc15; }
 
@@ -127,19 +147,19 @@ body.dark-theme {
 .counter span { min-width: 15px; text-align: center; font-weight: bold; color: #fff; }
 .size-item.active .counter span { color: #facc15; }
 
-.summary-box { margin: 30px 15px 20px 15px; border: 1px solid #333; border-radius: 12px; padding: 15px; display: flex; justify-content: space-between; align-items: center; }
+.summary-box { margin: 30px 15px 20px 15px; border: 1px solid #333; border-radius: 12px; padding: 15px; display: flex; justify-content: space-between; align-items: center; background: rgba(17, 17, 17, 0.85); backdrop-filter: blur(5px);}
 .summary-left { display: flex; align-items: center; gap: 10px; }
 .summary-left .icon-box { width: 40px; height: 40px; background: #222; border-radius: 8px; display: flex; align-items: center; justify-content: center; border: 1px solid #444;}
 .summary-left strong { display: block; font-size: 14px; color: #fff; }
 .summary-left span { font-size: 12px; color: #888; }
-.summary-right { text-align: right; }
+.summary-right { text-align: right; display: flex; flex-direction: column; gap: 2px; }
 .summary-right span { display: block; font-size: 11px; color: #888; margin-bottom: 3px;}
-.summary-right strong { font-size: 22px; font-weight: 800; }
+.summary-right strong { font-size: 22px; font-weight: 800; line-height: 1; }
 
 .btn-confirm { display: block; width: calc(100% - 30px); margin: 0 15px; padding: 18px; background: #facc15; color: #000; border: none; border-radius: 12px; font-size: 18px; font-weight: 900; font-style: italic; letter-spacing: 0.5px; cursor: pointer; text-transform: uppercase; transition: 0.2s; }
 .btn-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-confirm:not(:disabled):hover { background: #eab308; }
-.secure-text { text-align: center; font-size: 12px; color: #666; margin-top: 15px; }
+.secure-text { text-align: center; font-size: 12px; color: #aaa; margin-top: 15px; text-shadow: 0 1px 3px rgba(0,0,0,0.8);}
 
 /* TELAS DE PAGAMENTO (PIX) */
 .order-card { background-color: #111; border: 1px solid #27272a; border-radius: 16px; padding: 24px; margin-bottom: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
@@ -168,7 +188,7 @@ body.dark-theme {
 .btn-yellow { display: block; width: 100%; background: #facc15; color: #000; text-align: center; padding: 14px; border-radius: 8px; font-weight: 700; border: none; cursor: pointer; font-size: 16px; }
 .pix-warning { font-size: 13px; color: #a1a1aa; display: flex; align-items: center; gap: 8px; margin-top: 5px; margin-bottom: 0; }
 
-/* MODAL (CUSTOM) */
+/* MODAL */
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(5px); }
 .modal-box { background: #111; border: 1px solid #333; padding: 25px; border-radius: 16px; width: 85%; max-width: 320px; text-align: center; }
 .modal-box h3 { color: #fff; margin-top: 0; font-size: 18px; }
@@ -177,44 +197,3 @@ body.dark-theme {
 .modal-btns button { flex: 1; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; border: none; }
 .btn-cancel { background: #333; color: #fff; }
 .btn-ok { background: #facc15; color: #000; }
-/* ADIÇÕES PARA AS QUANTIDADES NO ADMIN */
-.category-setup { background: #1a1a1a; border: 1px solid #27272a; border-radius: 12px; padding: 15px; margin-bottom: 15px; }
-.cat-top { display: flex; gap: 10px; margin-bottom: 15px; }
-.cat-top input[type="text"] { flex: 2; background: #111; border: 1px solid #333; color: #fff; padding: 10px; border-radius: 6px; font-size: 14px; }
-.cat-top input[type="number"] { flex: 1; background: #111; border: 1px solid #333; color: #fff; padding: 10px; border-radius: 6px; font-size: 14px; }
-.cat-top input:focus { outline: none; border-color: #facc15; }
-.cat-sizes { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
-.size-input { display: flex; flex-direction: column; align-items: center; gap: 5px; }
-.size-input label { font-size: 12px; font-weight: 700; color: #facc15; }
-.size-input input { width: 100%; background: #111; border: 1px solid #333; color: #fff; text-align: center; padding: 8px; border-radius: 6px; font-weight: bold; }
-.size-input input:focus { outline: none; border-color: #facc15; }
-/* LAYOUT DO ADMIN COM CALCULADORA */
-.dashboard-grid { display: grid; grid-template-columns: 1fr 320px; gap: 30px; align-items: start; }
-@media (max-width: 900px) { .dashboard-grid { grid-template-columns: 1fr; } }
-
-/* CALCULADORA */
-.calc-card { position: sticky; top: 20px; border: 1px solid #facc15; }
-.calc-section h4 { font-size: 14px; color: #a1a1aa; margin-bottom: 10px; font-weight: 500; }
-.calc-row { display: flex; gap: 10px; }
-.calc-row label { flex: 1; display: flex; flex-direction: column; font-size: 12px; color: #888; gap: 5px; }
-.calc-row input { background: #1a1a1a; border: 1px solid #333; color: #fff; padding: 8px; border-radius: 6px; font-size: 14px; font-weight: bold; }
-.calc-row input:focus { outline: none; border-color: #facc15; }
-.calc-result { font-size: 13px; color: #a1a1aa; margin-top: 10px; display: flex; justify-content: space-between; }
-.calc-result strong { color: #fff; }
-.calc-total { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding-top: 20px; border-top: 1px dashed #333; }
-.calc-total span { font-weight: bold; color: #fff; }
-.calc-total h3 { font-size: 24px; margin: 0; }
-.calc-split { background: #1a1a1a; padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; margin-top: 15px; border: 1px solid #333; }
-.calc-split span { font-size: 13px; color: #a1a1aa; }
-.calc-split h4 { font-size: 18px; margin: 0; color: #e4e4e7; }
-
-/* RESUMO DO CLIENTE */
-.summary-right { text-align: right; display: flex; flex-direction: column; gap: 2px; }
-.summary-right strong { font-size: 22px; font-weight: 800; line-height: 1; }
-/* TROCA O FUNDO PARA A IMAGEM VERTICAL NO CELULAR */
-@media (max-width: 768px) {
-  body.dark-theme {
-    background-image: url('/assets/bg-mobile.jpg');
-    background-attachment: scroll; /* Melhora o desempenho no celular */
-  }
-}
