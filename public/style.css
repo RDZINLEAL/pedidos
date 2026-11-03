@@ -95,21 +95,13 @@ body.dark-theme {
 
 .mobile-container { max-width: 480px; margin: 0 auto; background: transparent; min-height: 100vh; padding-bottom: 40px; position: relative; }
 .brand-header { text-align: center; padding: 20px 0; }
+.top-banner-img { width: 100%; max-width: 260px; object-fit: contain; margin: 0 auto; display: block; }
 
-/* Status Banner (Fixo no topo do PIX) */
+/* Status Banner */
 .status-banner { 
-  display: none; /* Controlado via JS */
-  align-items: center; 
-  gap: 10px; 
-  background: rgba(0,0,0,0.8); 
-  border: 1px solid #facc15; 
-  border-radius: 8px; 
-  padding: 10px 15px; 
-  margin: 0 auto 15px auto; 
-  width: 90%; 
-  max-width: 440px;
-  box-shadow: 0 0 15px rgba(250, 204, 21, 0.1);
+  display: none; align-items: center; gap: 10px; background: rgba(0,0,0,0.8); border: 1px solid #facc15; border-radius: 8px; padding: 10px 15px; margin: 0 auto 15px auto; width: 90%; max-width: 440px; box-shadow: 0 0 15px rgba(250, 204, 21, 0.1); backdrop-filter: blur(5px);
 }
+.status-banner img { width: 30px; }
 .status-banner span { font-size: 14px; font-weight: 700; color: #fff; }
 
 /* Carrossel */
@@ -120,6 +112,8 @@ body.dark-theme {
 .carousel-slide img { width: 100%; height: auto; display: block; user-select: none; -webkit-user-drag: none; pointer-events: none; }
 
 /* Categorias e Tamanhos */
+.title-main { text-align: center; font-size: 24px; margin: 20px 0 5px; font-style: italic; font-weight: 900; }
+.subtitle { text-align: center; color: #ccc; font-size: 13px; margin-bottom: 20px; }
 .category-block { margin-bottom: 15px; padding: 0 15px; }
 .cat-title { font-size: 15px; color: #facc15; margin-bottom: 10px; font-weight: 600; }
 .sizes-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -131,10 +125,11 @@ body.dark-theme {
 .counter button { background: none; border: none; color: #fff; font-size: 18px; cursor: pointer; padding: 0 5px; touch-action: manipulation; }
 .counter span { min-width: 15px; text-align: center; font-weight: bold; color: #fff; }
 
-/* Resumo / Botão */
+/* Resumo / Botão Personalização */
 .summary-box { margin: 20px 15px; border: 1px solid #333; border-radius: 12px; padding: 15px; display: flex; justify-content: space-between; align-items: center; background: rgba(17, 17, 17, 0.85); backdrop-filter: blur(5px);}
 .summary-left { display: flex; align-items: center; gap: 10px; }
 .summary-left .icon-box { width: 40px; height: 40px; background: #222; border-radius: 8px; display: flex; align-items: center; justify-content: center; border: 1px solid #444;}
+.summary-left .icon-box img { width: 24px; }
 .summary-left strong { display: block; font-size: 14px; color: #fff; }
 .summary-left span { font-size: 12px; color: #888; }
 .summary-right { text-align: right; display: flex; flex-direction: column; gap: 2px; }
@@ -143,29 +138,36 @@ body.dark-theme {
 
 .btn-confirm { display: block; width: calc(100% - 30px); margin: 0 15px; padding: 18px; background: #facc15; color: #000; border: none; border-radius: 12px; font-size: 18px; font-weight: 900; font-style: italic; letter-spacing: 0.5px; cursor: pointer; text-transform: uppercase; transition: 0.2s; touch-action: manipulation;}
 .btn-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
+.secure-text { text-align: center; font-size: 12px; color: #888; margin-top: 10px; margin-bottom: 20px; }
 
 /* =========================================
-   LAYOUT ESPECÍFICO DE PAGAMENTO
+   TELA 2: LAYOUT DE PAGAMENTO PREMIUM
    ========================================= */
-.payment-card { padding: 20px !important; }
+.payment-card { padding: 20px !important; margin: 0 15px 20px 15px; background: #111; border: 1px solid #27272a; border-radius: 16px; }
 .card-header-line { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #27272a; padding-bottom: 10px; }
-.order-item-line { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
-.total-line { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+.product-row { display: flex; gap: 15px; align-items: center; margin-bottom: 15px; }
+.product-img { width: 80px; height: 80px; border-radius: 8px; overflow: hidden; flex-shrink: 0; border: 1px solid #333; }
+.product-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.product-info { flex: 1; }
+.order-items-container { font-size: 12px; color: #aaa; display: flex; flex-direction: column; gap: 4px; }
+.order-item-line { display: flex; justify-content: space-between; }
+.total-line { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid #27272a; }
 
-.pix-container { border: 1px solid #333; border-radius: 12px; padding: 15px; background: #0a0a0a; }
+/* Caixa PIX */
+.pix-container { border: 1px solid #333; border-radius: 12px; padding: 15px; background: #0a0a0a; margin-top: 20px; }
 .pix-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
 .pix-content { display: flex; gap: 15px; align-items: center; flex-wrap: wrap; }
 .qr-box { background: #fff; padding: 8px; border-radius: 8px; }
 .qr-box img { width: 120px; height: 120px; display: block; }
-.pix-instructions { flex: 1; min-width: 150px; }
+.pix-instructions { flex: 1; min-width: 140px; }
 .input-copy { display: flex; background: #222; border: 1px solid #333; border-radius: 6px; overflow: hidden; height: 36px; }
 .input-copy input { background: transparent; border: none; color: #aaa; padding: 0 10px; font-size: 11px; flex: 1; outline: none; }
 .input-copy button { background: #333; color: #fff; border: none; padding: 0 12px; font-size: 12px; font-weight: bold; cursor: pointer; }
 .btn-copy-large { width: 100%; margin-top: 15px; background: #facc15; color: #000; border: none; padding: 14px; border-radius: 8px; font-weight: 800; font-size: 14px; letter-spacing: 0.5px; cursor: pointer; text-transform: uppercase; }
 
 /* Selos de Confiança */
-.trust-badges-row { display: flex; justify-content: space-between; margin: 25px 0; padding: 0 10px; }
-.trust-badge { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; }
+.trust-badges-row { display: flex; justify-content: space-between; margin: 25px 0; padding: 0; }
+.trust-badge { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; flex: 1; }
 .trust-badge img { width: 35px; height: 35px; object-fit: contain; }
 .trust-badge span { font-size: 9px; color: #aaa; line-height: 1.2; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
 
@@ -181,8 +183,9 @@ body.dark-theme {
 .timeline-step span { font-size: 10px; color: #888; text-align: center; font-weight: 500; line-height: 1.2; }
 
 /* Footer Suporte */
-.support-footer { width: 90%; max-width: 440px; margin: 20px auto; border: 1px solid #333; border-radius: 12px; padding: 15px; display: flex; justify-content: space-between; align-items: center; background: rgba(17, 17, 17, 0.85); cursor: pointer; }
+.support-footer { width: 90%; max-width: 440px; margin: 20px auto; border: 1px solid #333; border-radius: 12px; padding: 15px; display: flex; justify-content: space-between; align-items: center; background: rgba(17, 17, 17, 0.85); cursor: pointer; backdrop-filter: blur(5px); }
 .support-left { display: flex; align-items: center; gap: 10px; }
+.support-left img { width: 30px; }
 .support-left span { font-size: 13px; color: #fff; font-weight: 500; }
 .support-footer .arrow { color: #facc15; font-size: 20px; font-weight: bold; }
 
