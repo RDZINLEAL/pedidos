@@ -224,11 +224,11 @@
       if (res.ok) {
         location.reload(); 
       } else {
-        alert('Erro ao gerar pagamento.');
+        const errJson = await res.json().catch(() => ({}));
+        alert('Erro ao gerar pagamento: ' + (errJson.error || 'Sem detalhes. Verifique o painel do Render.'));
         btn.textContent = 'CONFIRMAR PEDIDO';
         btn.disabled = false;
       }
-    }
 
     function show_payment_screen(order) {
       const total = (order.total_cents / 100).toFixed(2).replace('.', ',');
