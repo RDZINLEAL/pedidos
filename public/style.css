@@ -145,7 +145,7 @@ body.dark-theme {
 .btn-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* =========================================
-   LAYOUT ESPECÍFICO DE PAGAMENTO (O QUE VOCÊ PEDIU)
+   LAYOUT ESPECÍFICO DE PAGAMENTO
    ========================================= */
 .payment-card { padding: 20px !important; }
 .card-header-line { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #27272a; padding-bottom: 10px; }
@@ -163,7 +163,7 @@ body.dark-theme {
 .input-copy button { background: #333; color: #fff; border: none; padding: 0 12px; font-size: 12px; font-weight: bold; cursor: pointer; }
 .btn-copy-large { width: 100%; margin-top: 15px; background: #facc15; color: #000; border: none; padding: 14px; border-radius: 8px; font-weight: 800; font-size: 14px; letter-spacing: 0.5px; cursor: pointer; text-transform: uppercase; }
 
-/* Selos de Confiança (Grid) */
+/* Selos de Confiança */
 .trust-badges-row { display: flex; justify-content: space-between; margin: 25px 0; padding: 0 10px; }
 .trust-badge { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; }
 .trust-badge img { width: 35px; height: 35px; object-fit: contain; }

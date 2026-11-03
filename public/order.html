@@ -18,7 +18,7 @@
 
     <!-- Banner de Status Fixo -->
     <div class="status-banner">
-      <img src="/assets/08_status_aguardando_pagamento_transparent.png" alt="Aguardando Pagamento" style="width: 30px;">
+      <img src="/assets/Nova pasta/08_status_aguardando_pagamento_transparent.png" alt="Aguardando Pagamento" style="width: 30px;">
       <span>Aguardando Pagamento</span>
     </div>
 
@@ -28,7 +28,7 @@
     <!-- Rodapé de Suporte -->
     <div class="support-footer" onclick="window.open('https://wa.me/5511927078767', '_blank')">
       <div class="support-left">
-        <img src="/assets/04_suporte_atendimento_transparent.png" style="width: 30px;">
+        <img src="/assets/Nova pasta/04_suporte_atendimento_transparent.png" style="width: 30px;">
         <span>Precisa de ajuda? Fale com nossa equipe.</span>
       </div>
       <span class="arrow">›</span>
@@ -82,7 +82,7 @@
     // TELA 1: PERSONALIZAÇÃO / CONFERÊNCIA
     // ==========================================
     function build_customization_ui(order) {
-      document.querySelector('.status-banner').style.display = 'none'; // Esconde o banner de pagamento
+      document.querySelector('.status-banner').style.display = 'none'; 
 
       const wrap = document.getElementById('app-content');
       
@@ -105,7 +105,7 @@
 
         <div class="summary-box" style="margin-top: 20px;">
           <div class="summary-left">
-            <div class="icon-box"><img src="/assets/01_selo_seguranca_transparent.png" style="width: 24px;"></div>
+            <div class="icon-box"><img src="/assets/Nova pasta/01_selo_seguranca_transparent.png" style="width: 24px;"></div>
             <div>
               <strong>Camisa personalizada</strong>
               <span>Modelo esportivo</span>
@@ -176,11 +176,10 @@
     // TELA 2: PAGAMENTO PIX (LAYOUT PREMIUM)
     // ==========================================
     function show_payment_screen(order) {
-      document.querySelector('.status-banner').style.display = 'flex'; // Mostra o banner
+      document.querySelector('.status-banner').style.display = 'flex'; 
       const total = (order.total_cents / 100).toFixed(2).replace('.', ',');
       const qr_url = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(order.payment_link)}`;
       
-      // Monta a lista de itens do resumo
       let items_html = '';
       if(order.selected_sizes) {
         order.selected_sizes.forEach(s => {
@@ -221,7 +220,7 @@
           <div class="pix-container">
             <div class="pix-top">
               <div style="display:flex; align-items:center; gap:10px;">
-                <img src="/assets/01_selo_seguranca_transparent.png" style="width: 35px;">
+                <img src="/assets/Nova pasta/01_selo_seguranca_transparent.png" style="width: 35px;">
                 <div>
                   <h3 style="font-size: 16px; margin:0; color:#fff;">Pagamento via PIX</h3>
                   <p style="font-size: 11px; color: #888; margin:0;">Rápido, seguro e sem taxas.</p>
@@ -249,10 +248,10 @@
 
           <!-- SELOS DE CONFIANÇA -->
           <div class="trust-badges-row">
-            <div class="trust-badge"><img src="/assets/01_selo_seguranca_transparent.png"><span>Compra<br>Segura</span></div>
-            <div class="trust-badge"><img src="/assets/02_pagamento_rapido_transparent.png"><span>Pagamento<br>Rápido</span></div>
-            <div class="trust-badge"><img src="/assets/03_caixa_envio_transparent.png"><span>Produção<br>Ágil</span></div>
-            <div class="trust-badge"><img src="/assets/04_suporte_atendimento_transparent.png"><span>Suporte<br>Especializado</span></div>
+            <div class="trust-badge"><img src="/assets/Nova pasta/01_selo_seguranca_transparent.png"><span>Compra<br>Segura</span></div>
+            <div class="trust-badge"><img src="/assets/Nova pasta/02_pagamento_rapido_transparent.png"><span>Pagamento<br>Rápido</span></div>
+            <div class="trust-badge"><img src="/assets/Nova pasta/03_caixa_envio_transparent.png"><span>Produção<br>Ágil</span></div>
+            <div class="trust-badge"><img src="/assets/Nova pasta/04_suporte_atendimento_transparent.png"><span>Suporte<br>Especializado</span></div>
           </div>
 
           <!-- LINHA DO TEMPO -->
@@ -261,15 +260,15 @@
             <div class="timeline-track">
               <div class="timeline-line"></div>
               <div class="timeline-step">
-                <div class="timeline-icon active"><img src="/assets/05_etapa_pagamento_transparent.png"></div>
+                <div class="timeline-icon active"><img src="/assets/Nova pasta/05_etapa_pagamento_transparent.png"></div>
                 <span>Pagamento<br>Confirmado</span>
               </div>
               <div class="timeline-step">
-                <div class="timeline-icon"><img src="/assets/06_etapa_producao_transparent.png"></div>
+                <div class="timeline-icon"><img src="/assets/Nova pasta/06_etapa_producao_transparent.png"></div>
                 <span>Produção<br>(até 1 dia útil)</span>
               </div>
               <div class="timeline-step">
-                <div class="timeline-icon"><img src="/assets/07_etapa_entrega_transparent.png"></div>
+                <div class="timeline-icon"><img src="/assets/Nova pasta/07_etapa_entrega_transparent.png"></div>
                 <span>Envio<br>(código de rastreio)</span>
               </div>
             </div>
