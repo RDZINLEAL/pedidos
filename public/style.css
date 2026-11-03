@@ -113,11 +113,10 @@ body.dark-theme {
   line-height: 1.5; 
 }
 
-/* OTIMIZAÇÃO PARA CELULAR (Evita travamentos de scroll) */
 @media (max-width: 768px) {
   body.dark-theme {
     background-image: url('/assets/bg-mobile.jpg');
-    background-attachment: scroll; /* Isso remove o lag do fundo no celular */
+    background-attachment: scroll; 
     background-size: 100% auto;
   }
 }
@@ -128,23 +127,33 @@ body.dark-theme {
 .subtitle { text-align: center; color: #ccc; font-size: 13px; margin-bottom: 5px; text-shadow: 0 1px 3px rgba(0,0,0,0.8);}
 .title-line { width: 40px; height: 3px; background: #facc15; margin: 0 auto 30px auto; border-radius: 2px;}
 
-/* CARROSSEL FLUIDO E NATIVO */
+/* CARROSSEL */
 .carousel-container { width: 90%; margin: 0 auto 20px auto; border-radius: 16px; overflow: hidden; border: 1px solid #333; background: #111; }
 .carousel-track { 
   display: flex; 
   overflow-x: auto; 
   scroll-snap-type: x mandatory; 
   scroll-behavior: smooth;
-  -webkit-overflow-scrolling: touch; /* Scroll suave no iOS */
-  scrollbar-width: none; /* Esconde barra no Firefox */
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  cursor: grab;
+  user-select: none;
 }
-.carousel-track::-webkit-scrollbar { display: none; } /* Esconde barra no Chrome/Safari */
+.carousel-track::-webkit-scrollbar { display: none; }
+.carousel-track:active { cursor: grabbing; }
 
 .carousel-slide { 
-  flex: 0 0 100%; /* Cada foto ocupa exatamente a largura da caixa */
+  flex: 0 0 100%; 
   scroll-snap-align: center; 
 }
-.carousel-slide img { width: 100%; height: auto; display: block; }
+.carousel-slide img { 
+  width: 100%; 
+  height: auto; 
+  display: block; 
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none; 
+}
 .img-placeholder { height: 200px; display: flex; align-items: center; justify-content: center; color: #555; background: #111;}
 
 .category-block { margin-bottom: 20px; padding: 0 15px; }

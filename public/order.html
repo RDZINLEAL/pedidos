@@ -89,19 +89,22 @@
       let img_count = 0;
 
       if (order.photo_path) {
-        carousel_html += `<div class="carousel-slide"><img src="${order.photo_path}"></div>`;
+        carousel_html += `<div class="carousel-slide"><img src="${order.photo_path}" draggable="false"></div>`;
         img_count++;
       }
       
       if (order.hat_photo_path) {
-        carousel_html += `<div class="carousel-slide"><img src="${order.hat_photo_path}"></div>`;
+        carousel_html += `<div class="carousel-slide"><img src="${order.hat_photo_path}" draggable="false"></div>`;
         img_count++;
       }
 
       if (img_count > 0) {
-        document.getElementById('carousel').innerHTML = carousel_html;
+        const track = document.getElementById('carousel');
+        track.innerHTML = carousel_html;
+        
         if (img_count > 1) {
           document.getElementById('carousel-hint').style.display = 'block';
+          enable_drag_scroll(track); 
         }
       }
 
@@ -159,6 +162,37 @@
       }
       
       update_total(); 
+    }
+
+    function enable_drag_scroll(slider) {
+      let isDown = false;
+      let startX;
+      let scrollLeft;
+
+      slider.addEventListener('mousedown', (e) => {
+        isDown = true;
+        slider.style.cursor = 'grabbing';
+        startX = e.pageX - slider.offsetLeft;
+        scrollLeft = slider.scrollLeft;
+      });
+
+      slider.addEventListener('mouseleave', () => {
+        isDown = false;
+        slider.style.cursor = 'grab';
+      });
+
+      slider.addEventListener('mouseup', () => {
+        isDown = false;
+        slider.style.cursor = 'grab';
+      });
+
+      slider.addEventListener('mousemove', (e) => {
+        if (!isDown) return;
+        e.preventDefault(); 
+        const x = e.pageX - slider.offsetLeft;
+        const walk = (x - startX) * 2; 
+        slider.scrollLeft = scrollLeft - walk;
+      });
     }
 
     function attempt_change(cat, size, delta) {
