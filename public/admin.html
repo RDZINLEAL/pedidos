@@ -2,52 +2,98 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
-  <title>Painel Bravus</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Painel Bravus - Administração</title>
   <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="stylesheet" href="/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet">
 </head>
-<body>
-  <header><h1>Painel de Pedidos</h1></header>
-  <main>
-    <section>
-      <h2>Novo Pedido</h2>
-      <form id="order-form" enctype="multipart/form-data">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-          <label>Nome<input name="client_name" required></label>
-          <label>E-mail<input name="client_email" type="email" required></label>
-          <label>CPF/CNPJ<input name="client_document" required></label>
-          <label>Telefone<input name="client_phone" required></label>
-        </div>
-        <label>Foto da Peça (Capa)<input name="photo" type="file" accept="image/*"></label>
-        
-        <hr style="margin: 20px 0; border-top: 1px solid #ddd;">
-        <h3>Categorias Disponíveis</h3>
-        <div id="categories-container"></div>
-        <button type="button" onclick="add_category()" style="background: #555; margin-bottom: 15px;">+ Adicionar Categoria</button>
+<body class="admin-body">
+  <header class="admin-header">
+    <div class="header-content">
+      <h1>Painel <span class="yellow-text">Bravus</span></h1>
+      <span class="badge">Admin</span>
+    </div>
+  </header>
 
-        <div style="margin-bottom: 20px;">
-          <label style="display: flex; align-items: center; gap: 10px;">
-            <input type="checkbox" id="has_hat" name="has_hat" onchange="toggle_hat()"> Incluir Boné neste pedido?
+  <main class="admin-main">
+    <!-- SEÇÃO DE CRIAÇÃO -->
+    <section class="card">
+      <div class="card-header">
+        <h2>Novo Pedido</h2>
+        <p>Crie o esqueleto do pedido e envie o link para o cliente personalizar.</p>
+      </div>
+      
+      <form id="order-form" enctype="multipart/form-data">
+        <div class="form-grid">
+          <label class="input-group">Nome do Cliente
+            <input name="client_name" placeholder="Ex: João Silva" required>
           </label>
-          <div id="hat_price_div" style="display:none; margin-top: 10px;">
-            <label>Valor do Boné (R$)<input type="number" id="hat_price" name="hat_price" step="0.01" value="35.00"></label>
+          <label class="input-group">E-mail
+            <input name="client_email" type="email" placeholder="joao@email.com" required>
+          </label>
+          <label class="input-group">CPF/CNPJ
+            <input name="client_document" placeholder="Apenas números" required>
+          </label>
+          <label class="input-group">Telefone / WhatsApp
+            <input name="client_phone" placeholder="DDD + Número" required>
+          </label>
+        </div>
+
+        <label class="input-group file-input">
+          Foto Principal da Peça (Capa do Pedido)
+          <input name="photo" type="file" accept="image/*">
+        </label>
+
+        <hr class="divider">
+
+        <div class="section-title">
+          <h3>Categorias e Preços</h3>
+          <button type="button" onclick="add_category()" class="btn-secondary">+ Adicionar Categoria</button>
+        </div>
+        
+        <div id="categories-container" class="categories-list"></div>
+
+        <div class="hat-section">
+          <label class="switch-label">
+            <input type="checkbox" id="has_hat" name="has_hat" onchange="toggle_hat()">
+            <span class="slider"></span>
+            Incluir Boné neste pedido?
+          </label>
+          <div id="hat_price_div" class="hat-price-input" style="display:none;">
+            <label class="input-group">Valor do Boné (R$)
+              <input type="number" id="hat_price" name="hat_price" step="0.01" value="35.00">
+            </label>
           </div>
         </div>
 
-        <button type="submit">Gerar Link de Personalização</button>
+        <button type="submit" class="btn-primary">Gerar Link de Personalização</button>
       </form>
-      <p id="result"></p>
+      <p id="result" class="result-msg"></p>
     </section>
 
-    <section>
-      <div style="display: flex; justify-content: space-between;">
-        <h2>Pedidos</h2>
-        <button type="button" onclick="clear_orders()" style="background: #d33;">Apagar Todos</button>
+    <!-- SEÇÃO DA TABELA -->
+    <section class="card">
+      <div class="card-header table-header">
+        <h2>Pedidos Recentes</h2>
+        <button type="button" onclick="clear_orders()" class="btn-danger">Apagar Todos</button>
       </div>
-      <table>
-        <thead><tr><th>Código</th><th>Cliente</th><th>Status</th><th>Ação</th></tr></thead>
-        <tbody id="orders-body"></tbody>
-      </table>
+      
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Cliente</th>
+              <th>Status</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="orders-body">
+            <!-- Preenchido via JS -->
+          </tbody>
+        </table>
+      </div>
     </section>
   </main>
 
@@ -55,15 +101,14 @@
     function add_category() {
       const div = document.createElement('div');
       div.className = 'cat-row';
-      div.style = 'display: flex; gap: 10px; margin-bottom: 10px;';
       div.innerHTML = `
-        <input type="text" class="cat-name" placeholder="Ex: Gola Polo / Manga Longa" required style="flex:1; padding: 8px;">
-        <input type="number" class="cat-price" placeholder="Preço (R$)" step="0.01" required style="width: 100px; padding: 8px;">
-        <button type="button" onclick="this.parentElement.remove()" style="background:#d33; padding: 0 10px;">X</button>
+        <input type="text" class="cat-name" placeholder="Ex: Gola Polo / Manga Longa" required>
+        <input type="number" class="cat-price" placeholder="Preço (R$)" step="0.01" required>
+        <button type="button" class="btn-remove" onclick="this.parentElement.remove()">×</button>
       `;
       document.getElementById('categories-container').appendChild(div);
     }
-    add_category(); // começa com uma
+    add_category(); // Começa com uma linha
 
     function toggle_hat() {
       document.getElementById('hat_price_div').style.display = document.getElementById('has_hat').checked ? 'block' : 'none';
@@ -74,20 +119,37 @@
       const { orders } = await res.json();
       const tbody = document.getElementById('orders-body');
       tbody.innerHTML = '';
+      
+      if (orders.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#666;">Nenhum pedido cadastrado ainda.</td></tr>';
+        return;
+      }
+
       orders.forEach(o => {
         const link = `${window.location.origin}/pagamentoseguro#${o.id}`;
+        const statusClass = o.status === 'paid' ? 'status-paid' : (o.status === 'draft' ? 'status-draft' : 'status-pending');
+        
         tbody.innerHTML += `
           <tr>
-            <td><code>${o.id}</code></td>
-            <td>${o.client_name}</td>
-            <td><span class="status status-${o.status}">${o.status}</span></td>
-            <td><a href="${link}" target="_blank">Abrir Link</a></td>
+            <td><strong>${o.id}</strong></td>
+            <td>
+              ${o.client_name}<br>
+              <small style="color:#666;">${o.client_phone || ''}</small>
+            </td>
+            <td><span class="badge-status ${statusClass}">${o.status}</span></td>
+            <td>
+              <a href="${link}" target="_blank" class="btn-view">Abrir Link</a>
+            </td>
           </tr>`;
       });
     }
 
     document.getElementById('order-form').addEventListener('submit', async (e) => {
       e.preventDefault();
+      const btn = e.target.querySelector('button[type="submit"]');
+      btn.textContent = 'Gerando link...';
+      btn.disabled = true;
+
       const data = new FormData(e.target);
       
       const cats = [];
@@ -100,29 +162,40 @@
       
       data.append('categories', JSON.stringify(cats));
       data.append('has_hat', document.getElementById('has_hat').checked);
-      data.append('hat_price_cents', Math.round(parseFloat(document.getElementById('hat_price').value) * 100) || 0);
+      
+      const hatPrice = parseFloat(document.getElementById('hat_price').value);
+      data.append('hat_price_cents', Math.round((isNaN(hatPrice) ? 0 : hatPrice) * 100));
 
       const res = await fetch('/api/admin/orders', { method: 'POST', body: data });
       const json = await res.json();
       
+      const out = document.getElementById('result');
       if (res.ok) {
         const link = `${window.location.origin}/pagamentoseguro#${json.order.id}`;
-        document.getElementById('result').innerHTML = `Link gerado: <a href="${link}" target="_blank">${link}</a>`;
+        out.innerHTML = `✅ Pedido criado com sucesso! <br><a href="${link}" target="_blank">${link}</a>`;
+        out.style.color = '#22c55e';
+        
+        // Limpa o form
         e.target.reset();
         document.getElementById('categories-container').innerHTML = '';
         add_category();
         load_orders();
       } else {
-        document.getElementById('result').textContent = 'Erro: ' + json.error;
+        out.textContent = '❌ Erro: ' + json.error;
+        out.style.color = '#ef4444';
       }
+
+      btn.textContent = 'Gerar Link de Personalização';
+      btn.disabled = false;
     });
 
     async function clear_orders() {
-      if(confirm('Apagar todos?')) {
+      if(confirm('Atenção: Isso vai apagar TODOS os pedidos do banco de dados. Tem certeza?')) {
         await fetch('/api/admin/orders', { method: 'DELETE' });
         load_orders();
       }
     }
+
     load_orders();
   </script>
 </body>
