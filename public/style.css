@@ -77,8 +77,30 @@ button { font-family: inherit; cursor: pointer; transition: 0.2s; }
 /* =========================================
    TELA MOBILE DE PERSONALIZAÇÃO (CLIENTE)
    ========================================= */
-body.dark-theme { background-color: #000; color: #fff; }
-.mobile-container { max-width: 480px; margin: 0 auto; background: #000; min-height: 100vh; padding-bottom: 40px; position: relative;}
+body.dark-theme { 
+  font-family: 'Inter', sans-serif; 
+  color: #fff; 
+  margin: 0; 
+  line-height: 1.5; 
+  -webkit-font-smoothing: antialiased;
+  
+  /* CONFIGURAÇÃO DO FUNDO DESKTOP */
+  background-color: #050505;
+  background-image: url('/assets/bg-desktop.jpg');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+
+.mobile-container { 
+  max-width: 480px; 
+  margin: 0 auto; 
+  background: transparent; /* Deixa o fundo da imagem aparecer */
+  min-height: 100vh; 
+  padding-bottom: 40px; 
+  position: relative;
+}
 .brand-header { text-align: center; padding: 20px 0; }
 .title-main { text-align: center; font-size: 28px; margin: 10px 0; font-style: italic; font-weight: 900;}
 .subtitle { text-align: center; color: #888; font-size: 13px; margin-bottom: 5px; }
@@ -189,3 +211,10 @@ body.dark-theme { background-color: #000; color: #fff; }
 /* RESUMO DO CLIENTE */
 .summary-right { text-align: right; display: flex; flex-direction: column; gap: 2px; }
 .summary-right strong { font-size: 22px; font-weight: 800; line-height: 1; }
+/* TROCA O FUNDO PARA A IMAGEM VERTICAL NO CELULAR */
+@media (max-width: 768px) {
+  body.dark-theme {
+    background-image: url('/assets/bg-mobile.jpg');
+    background-attachment: scroll; /* Melhora o desempenho no celular */
+  }
+}
