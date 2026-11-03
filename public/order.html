@@ -11,17 +11,13 @@
 <body class="dark-theme">
   <div class="mobile-container">
     
-    <!-- Logo Topo -->
     <div class="brand-header">
       <img src="/assets/banner.png" style="width: 120px; object-fit: contain; margin-bottom: -10px;">
     </div>
 
-    <!-- Carrossel de Fotos -->
     <div class="carousel-container">
       <div class="carousel-track" id="carousel">
-        <div class="carousel-slide"><div class="img-placeholder">Foto 1</div></div>
-        <div class="carousel-slide"><div class="img-placeholder">Foto 2</div></div>
-        <div class="carousel-slide"><div class="img-placeholder">Foto 3</div></div>
+        <!-- Injetado via JS -->
       </div>
     </div>
 
@@ -29,13 +25,9 @@
     <p class="subtitle">Selecione os tamanhos para confirmar seu pedido.</p>
     <div class="title-line"></div>
 
-    <!-- Categorias e Tamanhos (Injetados via JS) -->
     <div id="categories-wrapper"></div>
-
-    <!-- Seção do Boné (Injetada via JS se disponível) -->
     <div id="hat-wrapper" style="display: none;"></div>
 
-    <!-- Footer Resumo -->
     <div class="summary-box">
       <div class="summary-left">
         <div class="icon-box"><img src="/assets/01-pix.png" style="width: 24px; opacity: 0.8;"></div>
@@ -50,14 +42,14 @@
       </div>
     </div>
 
-    <button class="btn-confirm" id="btn-confirm" onclick="open_confirm_modal()" disabled>CONFIRMAR PEDIDO</button>
+    <button class="btn-confirm" id="btn-confirm" onclick="open_confirm_modal()">CONFIRMAR PEDIDO</button>
     <p class="secure-text">🔒 Você poderá revisar antes do pagamento.</p>
 
-    <!-- Modal de Confirmação de Alteração -->
+    <!-- Modal de Alerta Único -->
     <div class="modal-overlay" id="modal-alter">
       <div class="modal-box">
         <h3>Atenção</h3>
-        <p>Você está prestes a alterar o tamanho da sua camisa. Deseja prosseguir?</p>
+        <p>Você está prestes a alterar a quantidade da sua camisa. Deseja prosseguir?</p>
         <div class="modal-btns">
           <button class="btn-cancel" onclick="close_alter_modal()">Cancelar</button>
           <button class="btn-ok" onclick="confirm_alter()">Sim, alterar</button>
@@ -70,9 +62,10 @@
   <script>
     const id = window.location.hash ? window.location.hash.replace('#', '') : window.location.pathname.split('/').pop();
     let orderData = null;
-    let selection = {}; // { "Manga Curta": { "M": 2, "G": 1 } }
+    let selection = {}; 
     let hatQty = 0;
-    let pendingChange = null; // { cat, size, delta, element }
+    let pendingChange = null; 
+    let modalShown = false; // A REGRA DE OURO: Só mostra uma vez
 
     async function init() {
       if (!id) return;
@@ -80,8 +73,6 @@
       if (!res.ok) return document.body.innerHTML = '<h1 style="color:white;text-align:center;margin-top:50px;">Pedido não encontrado.</h1>';
       
       const { order } = await res.json();
-      
-      // Se já pagou ou já gerou o PIX, mostra a tela de pagamento (reaproveitando o código anterior)
       if (order.status === 'paid' || order.status === 'pending') return show_payment_screen(order);
       
       orderData = order;
@@ -93,7 +84,9 @@
       
       const wrap = document.getElementById('categories-wrapper');
       order.available_categories.forEach(cat => {
-        selection[cat.name] = { PP:0, P:0, M:0, G:0, GG:0, XG:0 };
+        // Puxa as quantidades iniciais que o admin definiu, ou zero
+        selection[cat.name] = { ...cat.initial_sizes }; 
+        
         const catDiv = document.createElement('div');
         catDiv.className = 'category-block';
         catDiv.innerHTML = `<h2 class="cat-title">${cat.name}</h2><div class="sizes-grid" id="grid-${cat.name.replace(/\s/g,'')}"></div>`;
@@ -101,14 +94,15 @@
         
         const grid = catDiv.querySelector('.sizes-grid');
         ['PP', 'P', 'M', 'G', 'GG', 'XG'].forEach(size => {
+          const qty = selection[cat.name][size] || 0;
           const item = document.createElement('div');
-          item.className = 'size-item';
+          item.className = qty > 0 ? 'size-item active' : 'size-item';
           item.id = `item-${cat.name.replace(/\s/g,'')}-${size}`;
           item.innerHTML = `
             <span class="size-label">${size}</span>
             <div class="counter">
               <button onclick="attempt_change('${cat.name}', '${size}', -1)">−</button>
-              <span id="val-${cat.name.replace(/\s/g,'')}-${size}">0</span>
+              <span id="val-${cat.name.replace(/\s/g,'')}-${size}">${qty}</span>
               <button onclick="attempt_change('${cat.name}', '${size}', 1)">+</button>
             </div>
           `;
@@ -132,13 +126,15 @@
           </div>
         `;
       }
+      
+      update_total(); // Calcula o total inicial
     }
 
     function attempt_change(cat, size, delta) {
-      if (delta < 0 && selection[cat][size] === 0) return; // não deixa ficar negativo
+      // Se for diminuir e já for 0, não faz nada
+      if (delta < 0 && selection[cat][size] === 0) return; 
 
-      // Se for diminuir, pede confirmação (conforme o pedido)
-      if (delta < 0) {
+      if (!modalShown) {
         pendingChange = { cat, size, delta };
         document.getElementById('modal-alter').style.display = 'flex';
       } else {
@@ -147,7 +143,10 @@
     }
 
     function confirm_alter() {
-      if (pendingChange) apply_change(pendingChange.cat, pendingChange.size, pendingChange.delta);
+      if (pendingChange) {
+        apply_change(pendingChange.cat, pendingChange.size, pendingChange.delta);
+      }
+      modalShown = true; // Marca que o aviso já foi mostrado
       close_alter_modal();
     }
 
@@ -183,15 +182,6 @@
         }
       }
       document.getElementById('total-qty').textContent = totalQty;
-      
-      const btn = document.getElementById('btn-confirm');
-      if (totalQty > 0) {
-        btn.disabled = false;
-        btn.style.opacity = '1';
-      } else {
-        btn.disabled = true;
-        btn.style.opacity = '0.5';
-      }
     }
 
     async function open_confirm_modal() {
@@ -211,7 +201,7 @@
       });
 
       if (res.ok) {
-        location.reload(); // Recarrega para cair na tela de pagamento
+        location.reload(); 
       } else {
         alert('Erro ao gerar pagamento.');
         btn.textContent = 'CONFIRMAR PEDIDO';
@@ -219,7 +209,6 @@
       }
     }
 
-    // --- TELA DE PAGAMENTO (A mesma que você já tinha) ---
     function show_payment_screen(order) {
       const total = (order.total_cents / 100).toFixed(2).replace('.', ',');
       const qr_url = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(order.payment_link)}`;

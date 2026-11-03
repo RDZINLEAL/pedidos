@@ -155,3 +155,14 @@ body.dark-theme { background-color: #000; color: #fff; }
 .modal-btns button { flex: 1; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; border: none; }
 .btn-cancel { background: #333; color: #fff; }
 .btn-ok { background: #facc15; color: #000; }
+/* ADIÇÕES PARA AS QUANTIDADES NO ADMIN */
+.category-setup { background: #1a1a1a; border: 1px solid #27272a; border-radius: 12px; padding: 15px; margin-bottom: 15px; }
+.cat-top { display: flex; gap: 10px; margin-bottom: 15px; }
+.cat-top input[type="text"] { flex: 2; background: #111; border: 1px solid #333; color: #fff; padding: 10px; border-radius: 6px; font-size: 14px; }
+.cat-top input[type="number"] { flex: 1; background: #111; border: 1px solid #333; color: #fff; padding: 10px; border-radius: 6px; font-size: 14px; }
+.cat-top input:focus { outline: none; border-color: #facc15; }
+.cat-sizes { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+.size-input { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.size-input label { font-size: 12px; font-weight: 700; color: #facc15; }
+.size-input input { width: 100%; background: #111; border: 1px solid #333; color: #fff; text-align: center; padding: 8px; border-radius: 6px; font-weight: bold; }
+.size-input input:focus { outline: none; border-color: #facc15; }

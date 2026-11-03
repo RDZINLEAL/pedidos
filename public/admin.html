@@ -17,11 +17,10 @@
   </header>
 
   <main class="admin-main">
-    <!-- SEÇÃO DE CRIAÇÃO -->
     <section class="card">
       <div class="card-header">
         <h2>Novo Pedido</h2>
-        <p>Crie o esqueleto do pedido e envie o link para o cliente personalizar.</p>
+        <p>Preencha os dados e as quantidades iniciais. O cliente poderá alterar no link.</p>
       </div>
       
       <form id="order-form" enctype="multipart/form-data">
@@ -48,7 +47,7 @@
         <hr class="divider">
 
         <div class="section-title">
-          <h3>Categorias e Preços</h3>
+          <h3>Categorias e Tamanhos Iniciais</h3>
           <button type="button" onclick="add_category()" class="btn-secondary">+ Adicionar Categoria</button>
         </div>
         
@@ -72,7 +71,6 @@
       <p id="result" class="result-msg"></p>
     </section>
 
-    <!-- SEÇÃO DA TABELA -->
     <section class="card">
       <div class="card-header table-header">
         <h2>Pedidos Recentes</h2>
@@ -89,26 +87,42 @@
               <th>Ações</th>
             </tr>
           </thead>
-          <tbody id="orders-body">
-            <!-- Preenchido via JS -->
-          </tbody>
+          <tbody id="orders-body"></tbody>
         </table>
       </div>
     </section>
   </main>
 
   <script>
+    const sizes = ['PP', 'P', 'M', 'G', 'GG', 'XG'];
+
     function add_category() {
       const div = document.createElement('div');
-      div.className = 'cat-row';
+      div.className = 'category-setup';
+      
+      let sizes_html = '';
+      sizes.forEach(sz => {
+        sizes_html += `
+          <div class="size-input">
+            <label>${sz}</label>
+            <input type="number" class="init-size" data-size="${sz}" value="0" min="0">
+          </div>
+        `;
+      });
+
       div.innerHTML = `
-        <input type="text" class="cat-name" placeholder="Ex: Gola Polo / Manga Longa" required>
-        <input type="number" class="cat-price" placeholder="Preço (R$)" step="0.01" required>
-        <button type="button" class="btn-remove" onclick="this.parentElement.remove()">×</button>
+        <div class="cat-top">
+          <input type="text" class="cat-name" placeholder="Ex: Gola Polo / Manga Longa" required>
+          <input type="number" class="cat-price" placeholder="Preço (R$)" step="0.01" required>
+          <button type="button" class="btn-remove" onclick="this.closest('.category-setup').remove()">×</button>
+        </div>
+        <div class="cat-sizes">
+          ${sizes_html}
+        </div>
       `;
       document.getElementById('categories-container').appendChild(div);
     }
-    add_category(); // Começa com uma linha
+    add_category(); 
 
     function toggle_hat() {
       document.getElementById('hat_price_div').style.display = document.getElementById('has_hat').checked ? 'block' : 'none';
@@ -132,14 +146,9 @@
         tbody.innerHTML += `
           <tr>
             <td><strong>${o.id}</strong></td>
-            <td>
-              ${o.client_name}<br>
-              <small style="color:#666;">${o.client_phone || ''}</small>
-            </td>
+            <td>${o.client_name}<br><small style="color:#666;">${o.client_phone || ''}</small></td>
             <td><span class="badge-status ${statusClass}">${o.status}</span></td>
-            <td>
-              <a href="${link}" target="_blank" class="btn-view">Abrir Link</a>
-            </td>
+            <td><a href="${link}" target="_blank" class="btn-view">Abrir Link</a></td>
           </tr>`;
       });
     }
@@ -153,10 +162,16 @@
       const data = new FormData(e.target);
       
       const cats = [];
-      document.querySelectorAll('.cat-row').forEach(row => {
+      document.querySelectorAll('.category-setup').forEach(block => {
+        const init_sizes = {};
+        block.querySelectorAll('.init-size').forEach(input => {
+          init_sizes[input.dataset.size] = parseInt(input.value) || 0;
+        });
+
         cats.push({
-          name: row.querySelector('.cat-name').value,
-          price_cents: Math.round(parseFloat(row.querySelector('.cat-price').value) * 100)
+          name: block.querySelector('.cat-name').value,
+          price_cents: Math.round(parseFloat(block.querySelector('.cat-price').value) * 100),
+          initial_sizes: init_sizes
         });
       });
       
@@ -172,10 +187,9 @@
       const out = document.getElementById('result');
       if (res.ok) {
         const link = `${window.location.origin}/pagamentoseguro#${json.order.id}`;
-        out.innerHTML = `✅ Pedido criado com sucesso! <br><a href="${link}" target="_blank">${link}</a>`;
+        out.innerHTML = `✅ Pedido criado! <br><a href="${link}" target="_blank">${link}</a>`;
         out.style.color = '#22c55e';
         
-        // Limpa o form
         e.target.reset();
         document.getElementById('categories-container').innerHTML = '';
         add_category();
@@ -190,7 +204,7 @@
     });
 
     async function clear_orders() {
-      if(confirm('Atenção: Isso vai apagar TODOS os pedidos do banco de dados. Tem certeza?')) {
+      if(confirm('Atenção: Isso vai apagar TODOS os pedidos. Tem certeza?')) {
         await fetch('/api/admin/orders', { method: 'DELETE' });
         load_orders();
       }
