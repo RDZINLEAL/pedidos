@@ -62,9 +62,14 @@
               <span class="slider"></span>
               Incluir Boné neste pedido?
             </label>
+            
             <div id="hat_price_div" class="hat-price-input" style="display:none;">
               <label class="input-group">Valor do Boné (R$)
                 <input type="number" id="hat_price" name="hat_price" step="0.01" value="35.00">
+              </label>
+              <label class="input-group file-input" style="margin-bottom:0; margin-top:10px;">
+                Foto do Boné (Opcional)
+                <input name="hat_photo" type="file" accept="image/*">
               </label>
             </div>
           </div>
@@ -166,7 +171,6 @@
       document.getElementById('hat_price_div').style.display = document.getElementById('has_hat').checked ? 'block' : 'none';
     }
 
-    // Lógica da Calculadora
     function calc_total() {
       const sq = parseFloat(document.getElementById('calc_shirt_qty').value) || 0;
       const sp = parseFloat(document.getElementById('calc_shirt_price').value) || 0;

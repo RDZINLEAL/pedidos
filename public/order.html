@@ -12,19 +12,18 @@
   <div class="mobile-container">
     
     <div class="brand-header" style="padding: 10px 0;">
-      <!-- Banner maior e proporcional -->
       <img src="/assets/banner.png" style="width: 100%; max-width: 320px; object-fit: contain; margin: 0 auto; display: block;">
     </div>
 
     <div class="carousel-container">
       <div class="carousel-track" id="carousel"></div>
+      <div id="carousel-hint" style="display:none; text-align:center; font-size:11px; color:#facc15; padding:5px; background:rgba(0,0,0,0.5);">← Arraste para o lado para ver mais →</div>
     </div>
 
     <h1 class="title-main">Escolha os <span class="yellow-text">tamanhos</span></h1>
     <p class="subtitle">Selecione os tamanhos para confirmar seu pedido.</p>
     <div class="title-line"></div>
 
-    <!-- Onde as categorias vão aparecer -->
     <div id="categories-wrapper"></div>
     <div id="hat-wrapper" style="display: none;"></div>
 
@@ -76,7 +75,6 @@
         
         const { order } = await res.json();
         
-        // Se já pagou ou já está aguardando o PIX
         if (order.status === 'paid' || order.status === 'pending') return show_payment_screen(order);
         
         orderData = order;
@@ -87,22 +85,35 @@
     }
 
     function build_ui(order) {
-      // Se a foto existir, mostra
+      let carousel_html = '';
+      let img_count = 0;
+
       if (order.photo_path) {
-        document.getElementById('carousel').innerHTML = `<div class="carousel-slide"><img src="${order.photo_path}"></div>`;
+        carousel_html += `<div class="carousel-slide"><img src="${order.photo_path}"></div>`;
+        img_count++;
+      }
+      
+      if (order.hat_photo_path) {
+        carousel_html += `<div class="carousel-slide"><img src="${order.hat_photo_path}"></div>`;
+        img_count++;
+      }
+
+      if (img_count > 0) {
+        document.getElementById('carousel').innerHTML = carousel_html;
+        if (img_count > 1) {
+          document.getElementById('carousel-hint').style.display = 'block';
+        }
       }
 
       const wrap = document.getElementById('categories-wrapper');
-      wrap.innerHTML = ''; // Limpa antes de montar
+      wrap.innerHTML = '';
 
-      // A PROTEÇÃO: Se o pedido for velho e não tiver categorias, avisa em vez de quebrar
       if (!order.available_categories || order.available_categories.length === 0) {
-        wrap.innerHTML = '<div style="text-align:center; padding: 20px; color: #ff4444; font-size: 14px;">Erro: Este pedido foi criado antes da atualização e não tem categorias configuradas. Por favor, crie um novo pedido no painel.</div>';
+        wrap.innerHTML = '<div style="text-align:center; padding: 20px; color: #ff4444; font-size: 14px;">Erro: Este pedido foi criado antes da atualização. Crie um novo no painel.</div>';
         return;
       }
       
       order.available_categories.forEach(cat => {
-        // Puxa as quantidades iniciais, se não existirem, começa do zero
         selection[cat.name] = cat.initial_sizes ? { ...cat.initial_sizes } : { PP:0, P:0, M:0, G:0, GG:0, XG:0 };
         
         const catDiv = document.createElement('div');
@@ -134,7 +145,9 @@
           <div class="category-block">
             <h2 class="cat-title">Boné Personalizado (Opcional)</h2>
             <div class="size-item" style="width: 100%;">
-              <span class="size-label">Qtd de Bonés</span>
+              <span class="size-label" style="font-size: 14px;">
+                Boné <br><small style="color:#facc15;">R$ ${(order.hat_price_cents/100).toFixed(2).replace('.', ',')} cada</small>
+              </span>
               <div class="counter">
                 <button onclick="change_hat(-1)">−</button>
                 <span id="val-hat">0</span>

@@ -13,18 +13,16 @@ const OrderSchema = new mongoose.Schema({
   client_email: String,
   client_document: String,
   client_phone: String,
-  photo_path: String,
+  photo_path: String, // Foto da camisa
+  hat_photo_path: String, // FOTO DO BONÉ (NOVO)
   payment_link: String,
   mp_payment_id: String,
-  status: { type: String, default: 'draft' }, // draft -> pending -> paid
-  
-  // NOVO FORMATO DE DADOS
-  available_categories: Array, // Ex: [{ name: "Manga Curta", price_cents: 5000 }]
-  selected_sizes: Array,       // Ex: [{ category: "Manga Curta", sizes: { M: 2, G: 1 } }]
-  has_hat: Boolean,            // Se o admin liberou boné
+  status: { type: String, default: 'draft' },
+  available_categories: Array,
+  selected_sizes: Array,
+  has_hat: Boolean,
   hat_price_cents: Number,
   hat_quantity: { type: Number, default: 0 },
-  
   total_cents: Number,
   created_at: { type: Date, default: Date.now },
   paid_at: Date

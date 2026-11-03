@@ -26,7 +26,10 @@ const upload = multer({
     if (!/^image\/(jpe?g|png|webp)$/.test(file.mimetype)) return cb(new Error('Apenas imagens'));
     cb(null, true);
   }
-});
+}).fields([
+  { name: 'photo', maxCount: 1 },
+  { name: 'hat_photo', maxCount: 1 }
+]);
 
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
@@ -46,15 +49,19 @@ app.use('/limpar.html', basic_auth);
 app.use('/api/admin', basic_auth);
 app.use(express.static('public'));
 
-// ADMIN: Cria o esqueleto do pedido
-app.post('/api/admin/orders', upload.single('photo'), async (req, res) => {
+app.post('/api/admin/orders', upload, async (req, res) => {
   try {
     const { client_name, client_email, client_document, client_phone, categories, has_hat, hat_price_cents } = req.body;
+    
+    // Pega as imagens se elas existirem
+    const photo_path = req.files && req.files['photo'] ? `/uploads/${req.files['photo'][0].filename}` : null;
+    const hat_photo_path = req.files && req.files['hat_photo'] ? `/uploads/${req.files['hat_photo'][0].filename}` : null;
     
     const new_order = {
       id: randomBytes(3).toString('hex'),
       client_name, client_email, client_document, client_phone,
-      photo_path: req.file ? `/uploads/${req.file.filename}` : null,
+      photo_path,
+      hat_photo_path, // Salva no banco
       available_categories: JSON.parse(categories),
       has_hat: has_hat === 'true',
       hat_price_cents: Number(hat_price_cents) || 0,
@@ -67,7 +74,6 @@ app.post('/api/admin/orders', upload.single('photo'), async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// CLIENTE: Finaliza, calcula total e gera PIX
 app.post('/api/orders/:id/checkout', async (req, res) => {
   try {
     const { selected_sizes, hat_quantity } = req.body;
@@ -75,8 +81,6 @@ app.post('/api/orders/:id/checkout', async (req, res) => {
     if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
 
     let total_cents = 0;
-    
-    // Calcula tamanhos
     selected_sizes.forEach(sel => {
       const category_info = order.available_categories.find(c => c.name === sel.category);
       if (category_info) {
@@ -86,14 +90,12 @@ app.post('/api/orders/:id/checkout', async (req, res) => {
       }
     });
 
-    // Calcula bonés
     if (order.has_hat && hat_quantity > 0) {
       total_cents += (order.hat_price_cents * hat_quantity);
     }
 
     if (total_cents === 0) return res.status(400).json({ error: 'Selecione pelo menos um item.' });
 
-    // Chama a Invictus
     const tx = await create_transaction({ ...order, total_cents, items: [{ description: 'Pedido Bravus', quantity: 1, unit_price_cents: total_cents }] }, base);
     
     await update_order(order.id, {
