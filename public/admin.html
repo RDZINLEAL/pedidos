@@ -2,70 +2,72 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Painel Bravus</title>
   <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <header><h1>Painel de Pedidos - Bravus</h1></header>
+  <header><h1>Painel de Pedidos</h1></header>
   <main>
     <section>
-      <h2>Novo pedido</h2>
+      <h2>Novo Pedido</h2>
       <form id="order-form" enctype="multipart/form-data">
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-          <label>Nome do cliente<input name="client_name" required></label>
+          <label>Nome<input name="client_name" required></label>
           <label>E-mail<input name="client_email" type="email" required></label>
           <label>CPF/CNPJ<input name="client_document" required></label>
           <label>Telefone<input name="client_phone" required></label>
         </div>
-        <label>Foto principal (Opcional)<input name="photo" type="file" accept="image/*"></label>
-        <hr style="margin: 20px 0; border: 0; border-top: 1px solid #ddd;">
-        <h3>Itens do Pedido</h3>
-        <div id="items-container"></div>
-        <button type="button" onclick="add_item()" style="background: #555; margin-bottom: 15px;">+ Adicionar item</button>
-        <div style="font-size: 18px; font-weight: bold; margin-bottom: 20px;">
-          Total: <span id="total-display" style="color: #1f7a2e;">R$ 0,00</span>
+        <label>Foto da Peça (Capa)<input name="photo" type="file" accept="image/*"></label>
+        
+        <hr style="margin: 20px 0; border-top: 1px solid #ddd;">
+        <h3>Categorias Disponíveis</h3>
+        <div id="categories-container"></div>
+        <button type="button" onclick="add_category()" style="background: #555; margin-bottom: 15px;">+ Adicionar Categoria</button>
+
+        <div style="margin-bottom: 20px;">
+          <label style="display: flex; align-items: center; gap: 10px;">
+            <input type="checkbox" id="has_hat" name="has_hat" onchange="toggle_hat()"> Incluir Boné neste pedido?
+          </label>
+          <div id="hat_price_div" style="display:none; margin-top: 10px;">
+            <label>Valor do Boné (R$)<input type="number" id="hat_price" name="hat_price" step="0.01" value="35.00"></label>
+          </div>
         </div>
-        <button type="submit">Criar pedido e gerar link</button>
+
+        <button type="submit">Gerar Link de Personalização</button>
       </form>
       <p id="result"></p>
     </section>
+
     <section>
-      <h2>Pedidos Recentes</h2>
+      <div style="display: flex; justify-content: space-between;">
+        <h2>Pedidos</h2>
+        <button type="button" onclick="clear_orders()" style="background: #d33;">Apagar Todos</button>
+      </div>
       <table>
-        <thead><tr><th>Código</th><th>Cliente</th><th>Total</th><th>Status</th><th>Ação</th></tr></thead>
+        <thead><tr><th>Código</th><th>Cliente</th><th>Status</th><th>Ação</th></tr></thead>
         <tbody id="orders-body"></tbody>
       </table>
     </section>
   </main>
 
   <script>
-    function add_item() {
-      const container = document.getElementById('items-container');
-      const row = document.createElement('div');
-      row.className = 'item-row';
-      row.style = 'display: flex; gap: 10px; margin-bottom: 10px;';
-      row.innerHTML = `
-        <input type="text" class="item-desc" placeholder="Item" required style="flex: 1; padding: 8px;">
-        <input type="number" class="item-qty" placeholder="Qtd" value="1" min="1" required style="width: 60px; padding: 8px;">
-        <input type="number" class="item-price" placeholder="R$" step="0.01" required style="width: 80px; padding: 8px;">
-        <button type="button" onclick="this.parentElement.remove(); calc_total();" style="background: #d33; color: white; border: none; padding: 0 10px; cursor: pointer;">X</button>
+    function add_category() {
+      const div = document.createElement('div');
+      div.className = 'cat-row';
+      div.style = 'display: flex; gap: 10px; margin-bottom: 10px;';
+      div.innerHTML = `
+        <input type="text" class="cat-name" placeholder="Ex: Gola Polo / Manga Longa" required style="flex:1; padding: 8px;">
+        <input type="number" class="cat-price" placeholder="Preço (R$)" step="0.01" required style="width: 100px; padding: 8px;">
+        <button type="button" onclick="this.parentElement.remove()" style="background:#d33; padding: 0 10px;">X</button>
       `;
-      container.appendChild(row);
-      row.querySelector('.item-qty').addEventListener('input', calc_total);
-      row.querySelector('.item-price').addEventListener('input', calc_total);
+      document.getElementById('categories-container').appendChild(div);
     }
+    add_category(); // começa com uma
 
-    function calc_total() {
-      let total = 0;
-      document.querySelectorAll('.item-row').forEach(row => {
-        total += (parseInt(row.querySelector('.item-qty').value) || 0) * (parseFloat(row.querySelector('.item-price').value) || 0);
-      });
-      document.getElementById('total-display').textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
+    function toggle_hat() {
+      document.getElementById('hat_price_div').style.display = document.getElementById('has_hat').checked ? 'block' : 'none';
     }
-
-    add_item();
 
     async function load_orders() {
       const res = await fetch('/api/admin/orders');
@@ -73,47 +75,54 @@
       const tbody = document.getElementById('orders-body');
       tbody.innerHTML = '';
       orders.forEach(o => {
-        const tr = document.createElement('tr');
         const link = `${window.location.origin}/pagamentoseguro#${o.id}`;
-        tr.innerHTML = `
-          <td><code>${o.id}</code></td>
-          <td>${o.client_name}</td>
-          <td>R$ ${(o.total_cents/100).toFixed(2)}</td>
-          <td><span class="status status-${o.status}">${o.status}</span></td>
-          <td><a href="${link}" target="_blank">Abrir PIX</a></td>`;
-        tbody.appendChild(tr);
+        tbody.innerHTML += `
+          <tr>
+            <td><code>${o.id}</code></td>
+            <td>${o.client_name}</td>
+            <td><span class="status status-${o.status}">${o.status}</span></td>
+            <td><a href="${link}" target="_blank">Abrir Link</a></td>
+          </tr>`;
       });
     }
 
     document.getElementById('order-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const data = new FormData(e.target);
-      const items = [];
-      document.querySelectorAll('.item-row').forEach(row => {
-        items.push({
-          description: row.querySelector('.item-desc').value,
-          quantity: parseInt(row.querySelector('.item-qty').value),
-          unit_price_cents: Math.round(parseFloat(row.querySelector('.item-price').value) * 100)
+      
+      const cats = [];
+      document.querySelectorAll('.cat-row').forEach(row => {
+        cats.push({
+          name: row.querySelector('.cat-name').value,
+          price_cents: Math.round(parseFloat(row.querySelector('.cat-price').value) * 100)
         });
       });
-      data.append('items', JSON.stringify(items));
+      
+      data.append('categories', JSON.stringify(cats));
+      data.append('has_hat', document.getElementById('has_hat').checked);
+      data.append('hat_price_cents', Math.round(parseFloat(document.getElementById('hat_price').value) * 100) || 0);
 
       const res = await fetch('/api/admin/orders', { method: 'POST', body: data });
       const json = await res.json();
-      const out = document.getElementById('result');
       
-      if (res.ok && json.order.payment_link) {
+      if (res.ok) {
         const link = `${window.location.origin}/pagamentoseguro#${json.order.id}`;
-        out.innerHTML = `Pedido criado! <a href="${link}" target="_blank">${link}</a>`;
+        document.getElementById('result').innerHTML = `Link gerado: <a href="${link}" target="_blank">${link}</a>`;
         e.target.reset();
-        document.getElementById('items-container').innerHTML = '';
-        add_item();
+        document.getElementById('categories-container').innerHTML = '';
+        add_category();
         load_orders();
       } else {
-        out.textContent = 'Erro: ' + (json.error || 'Falha ao gerar PIX');
+        document.getElementById('result').textContent = 'Erro: ' + json.error;
       }
     });
 
+    async function clear_orders() {
+      if(confirm('Apagar todos?')) {
+        await fetch('/api/admin/orders', { method: 'DELETE' });
+        load_orders();
+      }
+    }
     load_orders();
   </script>
 </body>

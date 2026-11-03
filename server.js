@@ -10,7 +10,7 @@ import fs from 'fs';
 import { create_order, get_orders, get_order, update_order, delete_all_orders } from './db.js';
 import { create_transaction } from './invictus.js';
 
-const app  = express();
+const app = express();
 const port = Number(process.env.PORT || 3000);
 const base = process.env.PUBLIC_BASE_URL || `http://localhost:${port}`;
 
@@ -31,110 +31,91 @@ const upload = multer({
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 
-// FECHADURA DO ADMIN
 function basic_auth(req, res, next) {
   const user = process.env.ADMIN_USER || 'admin';
   const pass = process.env.ADMIN_PASSWORD || 'admin123';
   const b64auth = (req.headers.authorization || '').split(' ')[1] || '';
   const [login, password] = Buffer.from(b64auth, 'base64').toString().split(':');
-  
-  if (login && password && login === user && password === pass) return next();
-  
-  res.set('WWW-Authenticate', 'Basic realm="Painel Restrito"');
+  if (login === user && password === pass) return next();
+  res.set('WWW-Authenticate', 'Basic realm="Painel"');
   res.status(401).send('Acesso negado.');
 }
 
-// Protege as rotas
 app.use('/admin.html', basic_auth);
 app.use('/limpar.html', basic_auth);
 app.use('/api/admin', basic_auth);
-
-// Entrega os arquivos da pasta public
 app.use(express.static('public'));
 
-// Força a entrega do limpar.html (caso o express.static falhe)
-app.get('/limpar.html', basic_auth, (req, res) => res.sendFile(path.resolve('public/limpar.html')));
-
-// API DE CRIAR PEDIDO
+// ADMIN: Cria o esqueleto do pedido
 app.post('/api/admin/orders', upload.single('photo'), async (req, res) => {
   try {
-    const { client_name, client_email, client_document, client_phone, items } = req.body;
-    if (!client_name || !client_email || !client_document || !client_phone || !items) {
-      return res.status(400).json({ error: 'Preencha todos os dados do cliente e itens.' });
-    }
+    const { client_name, client_email, client_document, client_phone, categories, has_hat, hat_price_cents } = req.body;
     
-    const parsed_items = JSON.parse(items);
-    let total_cents = 0;
-    parsed_items.forEach(item => total_cents += (item.unit_price_cents * item.quantity));
-
-    const id = randomBytes(3).toString('hex');
-    const photo_path = req.file ? `/uploads/${req.file.filename}` : null;
-
     const new_order = {
-      id, client_name, client_email, client_document, client_phone, items: parsed_items, total_cents, photo_path,
-      payment_link: null, mp_preference_id: null, mp_payment_id: null, paid_at: null, status: 'pending'
+      id: randomBytes(3).toString('hex'),
+      client_name, client_email, client_document, client_phone,
+      photo_path: req.file ? `/uploads/${req.file.filename}` : null,
+      available_categories: JSON.parse(categories),
+      has_hat: has_hat === 'true',
+      hat_price_cents: Number(hat_price_cents) || 0,
+      status: 'draft',
+      total_cents: 0
     };
 
     await create_order(new_order);
+    res.json({ order: await get_order(new_order.id) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
-    try {
-      const tx = await create_transaction(new_order, base);
-      await update_order(id, { mp_preference_id: tx.transaction_id, payment_link: tx.payment_link });
-    } catch (err) {
-      console.error('[invictus] Falha:', err.message);
+// CLIENTE: Finaliza, calcula total e gera PIX
+app.post('/api/orders/:id/checkout', async (req, res) => {
+  try {
+    const { selected_sizes, hat_quantity } = req.body;
+    const order = await get_order(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
+
+    let total_cents = 0;
+    
+    // Calcula tamanhos
+    selected_sizes.forEach(sel => {
+      const category_info = order.available_categories.find(c => c.name === sel.category);
+      if (category_info) {
+        for (const [size, qty] of Object.entries(sel.sizes)) {
+          total_cents += (category_info.price_cents * qty);
+        }
+      }
+    });
+
+    // Calcula bonés
+    if (order.has_hat && hat_quantity > 0) {
+      total_cents += (order.hat_price_cents * hat_quantity);
     }
 
-    res.json({ order: await get_order(id) });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
+    if (total_cents === 0) return res.status(400).json({ error: 'Selecione pelo menos um item.' });
+
+    // Chama a Invictus
+    const tx = await create_transaction({ ...order, total_cents, items: [{ description: 'Pedido Bravus', quantity: 1, unit_price_cents: total_cents }] }, base);
+    
+    await update_order(order.id, {
+      selected_sizes,
+      hat_quantity: Number(hat_quantity) || 0,
+      total_cents,
+      status: 'pending',
+      payment_link: tx.payment_link,
+      mp_preference_id: tx.transaction_id
+    });
+
+    res.json({ success: true, payment_link: tx.payment_link });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// API DE LISTAR PEDIDOS
-app.get('/api/admin/orders', async (_req, res) => {
-  res.json({ orders: await get_orders() });
-});
-
-// API DE APAGAR PEDIDOS
-app.delete('/api/admin/orders', async (req, res) => {
-  try {
-    await delete_all_orders();
-    res.json({ success: true, message: 'Todos os pedidos foram apagados.' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// API DO CLIENTE
+app.get('/api/admin/orders', async (_req, res) => res.json({ orders: await get_orders() }));
+app.delete('/api/admin/orders', async (req, res) => { await delete_all_orders(); res.json({ success: true }); });
 app.get('/api/orders/:id', async (req, res) => {
   const order = await get_order(req.params.id);
-  if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
+  if (!order) return res.status(404).json({ error: 'Não encontrado' });
   res.json({ order });
 });
 
-// WEBHOOK DA INVICTUS
-app.post('/api/webhook/invictus', async (req, res) => {
-  try {
-    const { event, transaction } = req.body;
-    const order_id = req.query.order_id;
-
-    if (order_id && transaction) {
-      if (event === 'EVENT:CHARGE_PAID') {
-        await update_order(order_id, { status: 'paid', mp_payment_id: transaction.id, paid_at: new Date().toISOString() });
-      } else if (event === 'EVENT:CHARGE_EXPIRED' || event === 'EVENT:CHARGE_REFUND') {
-        await update_order(order_id, { status: 'rejected' });
-      }
-    }
-    res.sendStatus(200);
-  } catch (err) {
-    console.error('[webhook]', err);
-    res.sendStatus(500);
-  }
-});
-
-// TELAS
 app.get('/pagamentoseguro', (_req, res) => res.sendFile(path.resolve('public/order.html')));
-app.get('/order/:id', (_req, res) => res.sendFile(path.resolve('public/order.html')));
-
 app.listen(port, () => console.log(`Rodando em ${base}`));
