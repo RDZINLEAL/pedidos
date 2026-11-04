@@ -51,11 +51,9 @@ app.post('/api/admin/orders', (req, res) => {
     if (err) return res.status(400).json({ error: err.message });
 
     try {
-      const { client_name, client_email, client_document, client_phone, categories, has_hat, hat_price_cents, initial_hat_qty, product_name, product_description } = req.body;
+      const { client_name, client_email, client_document, client_phone, categories, product_name, product_description } = req.body;
       
       const photos = req.files ? req.files.map(f => `/uploads/${f.filename}`) : [];
-      const parsed_hat_qty = Number(initial_hat_qty) || 0;
-      const parsed_hat_price = Number(hat_price_cents) || 0;
 
       const new_order = {
         id: randomBytes(3).toString('hex'),
@@ -64,10 +62,6 @@ app.post('/api/admin/orders', (req, res) => {
         product_name: product_name || 'Camisa personalizada',
         product_description: product_description || 'Modelo esportivo',
         available_categories: JSON.parse(categories),
-        // TRAVA DE SEGURANÇA: Se tiver qtd de boné, ativa o boné automaticamente
-        has_hat: (parsed_hat_qty > 0) || (has_hat === 'true'),
-        hat_price_cents: parsed_hat_price,
-        initial_hat_qty: parsed_hat_qty,
         status: 'draft',
         total_cents: 0
       };
@@ -82,29 +76,20 @@ app.post('/api/admin/orders', (req, res) => {
 
 app.post('/api/orders/:id/checkout', async (req, res) => {
   try {
-    const { selected_sizes, hat_quantity } = req.body;
+    const { selected_sizes } = req.body; // Agora tudo vem aqui, camisas e bonés
     const order = await get_order(req.params.id);
     if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
 
     let total_cents = 0;
     
-    // Soma Camisas
-    if (selected_sizes && selected_sizes.length > 0) {
-      selected_sizes.forEach(sel => {
-        const category_info = order.available_categories.find(c => c.name === sel.category);
-        if (category_info) {
-          for (const [size, qty] of Object.entries(sel.sizes)) {
-            total_cents += (category_info.price_cents * qty);
-          }
+    selected_sizes.forEach(sel => {
+      const category_info = order.available_categories.find(c => c.name === sel.category);
+      if (category_info) {
+        for (const [size, qty] of Object.entries(sel.sizes)) {
+          total_cents += (category_info.price_cents * qty);
         }
-      });
-    }
-
-    // Soma Bonés (FORÇADO A CALCULAR SE TIVER QUANTIDADE)
-    const final_hat_qty = Number(hat_quantity) || 0;
-    if (final_hat_qty > 0) {
-      total_cents += (order.hat_price_cents * final_hat_qty);
-    }
+      }
+    });
 
     if (total_cents === 0) return res.status(400).json({ error: 'Selecione pelo menos um item.' });
 
@@ -112,7 +97,6 @@ app.post('/api/orders/:id/checkout', async (req, res) => {
     
     await update_order(order.id, {
       selected_sizes,
-      hat_quantity: final_hat_qty,
       total_cents,
       status: 'pending',
       payment_link: tx.payment_link,

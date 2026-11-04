@@ -47,7 +47,6 @@
     const id = window.location.hash ? window.location.hash.replace('#', '') : window.location.pathname.split('/').pop();
     let orderData = null;
     let selection = {}; 
-    let hatQty = 0;
     let pendingChange = null; 
     let modalShown = false; 
 
@@ -80,9 +79,6 @@
 
     function build_customization_ui(order) {
       document.getElementById('status-banner').style.display = 'none'; 
-      
-      // PUXA A QUANTIDADE INICIAL DO BANCO DE DADOS
-      hatQty = Number(order.initial_hat_qty) || 0;
 
       let carousel_html = '';
       let img_count = 0;
@@ -104,7 +100,6 @@
         <p class="subtitle">Ajuste os tamanhos se necessário.</p>
 
         <div id="categories-wrapper"></div>
-        <div id="hat-wrapper" style="display: none;"></div>
 
         <div class="summary-box">
           <div class="summary-left">
@@ -129,13 +124,16 @@
       document.getElementById('app-content').innerHTML = html;
 
       const catWrap = document.getElementById('categories-wrapper');
-      if (order.available_categories && order.available_categories.length > 0) {
-        order.available_categories.forEach(cat => {
-          selection[cat.name] = cat.initial_sizes ? { ...cat.initial_sizes } : { PP:0, P:0, M:0, G:0, GG:0, XG:0 };
-          
-          const catDiv = document.createElement('div');
-          catDiv.className = 'category-block';
-          catDiv.innerHTML = `<h2 class="cat-title">${cat.name}</h2><div class="sizes-grid" id="grid-${cat.name.replace(/\s/g,'')}"></div>`;
+      
+      order.available_categories.forEach((cat, index) => {
+        selection[cat.name] = cat.initial_sizes ? { ...cat.initial_sizes } : { 'Unico': 0 };
+        
+        const catDiv = document.createElement('div');
+        catDiv.className = 'category-block';
+        
+        if (cat.has_sizes) {
+          // RENDERIZA COMO CAMISA (COM TAMANHOS)
+          catDiv.innerHTML = `<h2 class="cat-title">${cat.name}</h2><div class="sizes-grid" id="grid-${index}"></div>`;
           catWrap.appendChild(catDiv);
           
           const grid = catDiv.querySelector('.sizes-grid');
@@ -143,60 +141,51 @@
             const qty = selection[cat.name][size] || 0;
             const item = document.createElement('div');
             item.className = qty > 0 ? 'size-item active' : 'size-item';
-            item.id = `item-${cat.name.replace(/\s/g,'')}-${size}`;
+            item.id = `item-${index}-${size}`;
             item.innerHTML = `
               <span class="size-label">${size}</span>
               <div class="counter">
-                <button onclick="attempt_change('${cat.name}', '${size}', -1)">−</button>
-                <span id="val-${cat.name.replace(/\s/g,'')}-${size}">${qty}</span>
-                <button onclick="attempt_change('${cat.name}', '${size}', 1)">+</button>
+                <button onclick="attempt_change('${cat.name}', '${size}', -1, ${index})">−</button>
+                <span id="val-${index}-${size}">${qty}</span>
+                <button onclick="attempt_change('${cat.name}', '${size}', 1, ${index})">+</button>
               </div>
             `;
             grid.appendChild(item);
           });
-        });
-      }
-
-      // RENDERIZA O BONÉ (Sempre que tiver quantidade inicial > 0 ou has_hat for true)
-      if (order.has_hat || hatQty > 0) {
-        document.getElementById('hat-wrapper').style.display = 'block';
-        document.getElementById('hat-wrapper').innerHTML = `
-          <div class="category-block">
-            <h2 class="cat-title">Boné Personalizado</h2>
-            <div class="size-item ${hatQty > 0 ? 'active' : ''}" id="hat-item" style="width: 100%;">
-              <span class="size-label" style="font-size: 14px;">Boné <br><small style="color:#facc15;">R$ ${(order.hat_price_cents/100).toFixed(2).replace('.', ',')} cada</small></span>
+        } else {
+          // RENDERIZA COMO BONÉ (SEM TAMANHOS)
+          const qty = selection[cat.name]['Unico'] || 0;
+          catDiv.innerHTML = `
+            <h2 class="cat-title">${cat.name}</h2>
+            <div class="size-item ${qty > 0 ? 'active' : ''}" id="item-${index}-Unico" style="width: 100%;">
+              <span class="size-label" style="font-size: 14px;">${cat.name} <br><small style="color:#facc15;">R$ ${(cat.price_cents/100).toFixed(2).replace('.', ',')} cada</small></span>
               <div class="counter">
-                <button onclick="change_hat(-1)">−</button><span id="val-hat">${hatQty}</span><button onclick="change_hat(1)">+</button>
+                <button onclick="attempt_change('${cat.name}', 'Unico', -1, ${index})">−</button>
+                <span id="val-${index}-Unico">${qty}</span>
+                <button onclick="attempt_change('${cat.name}', 'Unico', 1, ${index})">+</button>
               </div>
             </div>
-          </div>
-        `;
-      }
+          `;
+          catWrap.appendChild(catDiv);
+        }
+      });
 
       if (img_count > 1) enable_drag_scroll(document.getElementById('carousel'));
       update_total();
     }
 
     function update_total() {
-      let totalQty = hatQty;
+      let totalQty = 0;
       let totalPriceCents = 0;
       
-      // Camisas
-      for (const cat in selection) {
-        const catInfo = orderData.available_categories.find(c => c.name === cat);
-        const catPrice = catInfo ? catInfo.price_cents : 0;
-        for (const size in selection[cat]) {
-          const qty = selection[cat][size];
+      orderData.available_categories.forEach(cat => {
+        const catPrice = cat.price_cents;
+        for (const size in selection[cat.name]) {
+          const qty = selection[cat.name][size];
           totalQty += qty;
           totalPriceCents += (catPrice * qty);
         }
-      }
-      
-      // Bonés (MATEMÁTICA FORÇADA)
-      const hPrice = Number(orderData.hat_price_cents) || 0;
-      if (hatQty > 0) {
-        totalPriceCents += (hPrice * hatQty);
-      }
+      });
 
       document.getElementById('total-qty').textContent = totalQty;
       document.getElementById('total-price').textContent = `R$ ${(totalPriceCents / 100).toFixed(2).replace('.', ',')}`;
@@ -213,11 +202,12 @@
       let items_html = '';
       if(order.selected_sizes) {
         order.selected_sizes.forEach(s => {
-          let qtds = Object.entries(s.sizes).filter(([_, q]) => q > 0).map(([sz, q]) => `${q} un ${sz}`).join(', ');
+          let qtds = Object.entries(s.sizes).filter(([_, q]) => q > 0).map(([sz, q]) => {
+            return sz === 'Unico' ? `${q} un` : `${q} un ${sz}`;
+          }).join(', ');
           if (qtds) items_html += `<div class="order-item-line"><span>${s.category}</span><span class="yellow-text">${qtds}</span></div>`;
         });
       }
-      if (order.hat_quantity > 0) items_html += `<div class="order-item-line"><span>Boné Personalizado</span><span class="yellow-text">${order.hat_quantity} un</span></div>`;
 
       const html = `
         <div class="card payment-card">
@@ -298,11 +288,34 @@
 
     function copy_pix() { const txt = document.getElementById('pix-code'); txt.select(); document.execCommand('copy'); alert('Código PIX copiado com sucesso!'); }
     function enable_drag_scroll(slider) { let isDown = false; let startX; let scrollLeft; slider.addEventListener('mousedown', (e) => { isDown = true; slider.style.cursor = 'grabbing'; startX = e.pageX - slider.offsetLeft; scrollLeft = slider.scrollLeft; }); slider.addEventListener('mouseleave', () => { isDown = false; slider.style.cursor = 'grab'; }); slider.addEventListener('mouseup', () => { isDown = false; slider.style.cursor = 'grab'; }); slider.addEventListener('mousemove', (e) => { if (!isDown) return; e.preventDefault(); const x = e.pageX - slider.offsetLeft; const walk = (x - startX) * 2; slider.scrollLeft = scrollLeft - walk; }); }
-    function attempt_change(cat, size, delta) { if (delta < 0 && selection[cat][size] === 0) return; if (!modalShown) { pendingChange = { cat, size, delta }; document.getElementById('modal-alter').style.display = 'flex'; } else { apply_change(cat, size, delta); } }
-    function confirm_alter() { if (pendingChange) apply_change(pendingChange.cat, pendingChange.size, pendingChange.delta); modalShown = true; close_alter_modal(); }
-    function close_alter_modal() { document.getElementById('modal-alter').style.display = 'none'; pendingChange = null; }
-    function apply_change(cat, size, delta) { selection[cat][size] += delta; document.getElementById(`val-${cat.replace(/\s/g,'')}-${size}`).textContent = selection[cat][size]; const parent = document.getElementById(`item-${cat.replace(/\s/g,'')}-${size}`); if (selection[cat][size] > 0) parent.classList.add('active'); else parent.classList.remove('active'); update_total(); }
-    function change_hat(delta) { if (delta < 0 && hatQty === 0) return; hatQty += delta; document.getElementById('val-hat').textContent = hatQty; const parent = document.getElementById('hat-item'); if (hatQty > 0) parent.classList.add('active'); else parent.classList.remove('active'); update_total(); }
+
+    function attempt_change(cat, size, delta, catIndex) {
+      if (delta < 0 && selection[cat][size] === 0) return; 
+      if (!modalShown) {
+        pendingChange = { cat, size, delta, catIndex };
+        document.getElementById('modal-alter').style.display = 'flex';
+      } else {
+        apply_change(cat, size, delta, catIndex);
+      }
+    }
+
+    function confirm_alter() {
+      if (pendingChange) apply_change(pendingChange.cat, pendingChange.size, pendingChange.delta, pendingChange.catIndex);
+      modalShown = true; close_alter_modal();
+    }
+
+    function close_alter_modal() {
+      document.getElementById('modal-alter').style.display = 'none';
+      pendingChange = null;
+    }
+
+    function apply_change(cat, size, delta, catIndex) {
+      selection[cat][size] += delta;
+      document.getElementById(`val-${catIndex}-${size}`).textContent = selection[cat][size];
+      const parent = document.getElementById(`item-${catIndex}-${size}`);
+      if (selection[cat][size] > 0) parent.classList.add('active'); else parent.classList.remove('active');
+      update_total();
+    }
 
     async function open_confirm_modal() {
       const btn = document.getElementById('btn-confirm');
@@ -310,8 +323,7 @@
       btn.disabled = true;
 
       const payload = {
-        selected_sizes: Object.keys(selection).map(cat => ({ category: cat, sizes: selection[cat] })),
-        hat_quantity: hatQty
+        selected_sizes: Object.keys(selection).map(cat => ({ category: cat, sizes: selection[cat] }))
       };
 
       try {

@@ -23,13 +23,8 @@ const OrderSchema = new mongoose.Schema({
   product_name: { type: String, default: 'Camisa personalizada' },
   product_description: { type: String, default: 'Modelo esportivo' },
 
-  available_categories: Array,
+  available_categories: Array, // Aqui vai entrar TUDO, inclusive o Boné
   selected_sizes: Array,
-  
-  has_hat: { type: Boolean, default: false },
-  hat_price_cents: { type: Number, default: 0 },
-  initial_hat_qty: { type: Number, default: 0 },
-  hat_quantity: { type: Number, default: 0 },
   
   total_cents: Number,
   created_at: { type: Date, default: Date.now },

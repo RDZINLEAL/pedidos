@@ -56,30 +56,11 @@
           <hr class="divider">
 
           <div class="section-title">
-            <h3>Categorias de Camisas (Tamanhos)</h3>
+            <h3>Categorias (Camisas, Bonés, etc)</h3>
             <button type="button" onclick="add_category()" class="btn-secondary">+ Adicionar Categoria</button>
           </div>
           
           <div id="categories-container" class="categories-list"></div>
-
-          <div class="hat-section" style="background: rgba(250, 204, 21, 0.05); border-color: #facc15;">
-            <label class="switch-label">
-              <input type="checkbox" id="has_hat" name="has_hat" onchange="toggle_hat()" checked>
-              <span class="slider"></span>
-              <strong>Incluir Boné neste pedido?</strong>
-            </label>
-            
-            <div id="hat_price_div" class="hat-price-input" style="display:block;">
-              <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <label class="input-group" style="flex: 1; margin-bottom: 0;">Quantos Bonés no Total?
-                  <input type="number" id="hat_initial_qty" name="initial_hat_qty" value="10" min="0" required>
-                </label>
-                <label class="input-group" style="flex: 1; margin-bottom: 0;">Preço de Cada Boné (R$)
-                  <input type="number" id="hat_price" name="hat_price" step="0.01" value="20.00" required>
-                </label>
-              </div>
-            </div>
-          </div>
 
           <button type="submit" class="btn-primary" style="margin-top: 20px;">Gerar Link de Personalização</button>
         </form>
@@ -121,7 +102,7 @@
           </div>
         </div>
         <div class="calc-section" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #27272a;">
-          <h4>Bonés</h4>
+          <h4>Outros (Bonés)</h4>
           <div class="calc-row">
             <label>Qtd<input type="number" id="calc_hat_qty" value="0" min="0" oninput="calc_total()"></label>
             <label>Valor Un. (R$)<input type="number" id="calc_hat_price" value="0.00" step="0.01" oninput="calc_total()"></label>
@@ -145,30 +126,53 @@
     function add_category() {
       const div = document.createElement('div');
       div.className = 'category-setup';
-      let sizes_html = '';
-      sizes.forEach(sz => {
-        sizes_html += `
-          <div class="size-input">
-            <label>${sz}</label>
-            <input type="number" class="init-size" data-size="${sz}" value="0" min="0">
-          </div>
-        `;
-      });
+      
       div.innerHTML = `
-        <div class="cat-top">
-          <input type="text" class="cat-name" placeholder="Ex: Gola Polo" required>
-          <input type="number" class="cat-price" placeholder="Preço Un. (R$)" step="0.01" required>
-          <button type="button" class="btn-remove" onclick="this.closest('.category-setup').remove()">×</button>
+        <div class="cat-top" style="flex-direction: column; gap: 10px; align-items: stretch;">
+          <div style="display: flex; gap: 10px;">
+            <input type="text" class="cat-name" placeholder="Ex: Camisa Polo ou Boné" required style="flex: 2;">
+            <input type="number" class="cat-price" placeholder="Preço Un. (R$)" step="0.01" required style="flex: 1;">
+            <button type="button" class="btn-remove" onclick="this.closest('.category-setup').remove()">×</button>
+          </div>
+          <label class="switch-label" style="font-size: 13px;">
+            <input type="checkbox" class="cat-has-sizes" checked onchange="toggle_sizes(this)">
+            Esta categoria tem tamanhos (PP, P, M...)?
+          </label>
         </div>
-        <div class="cat-sizes">${sizes_html}</div>
+        
+        <div class="cat-sizes" style="margin-top: 15px;">
+          ${sizes.map(sz => `
+            <div class="size-input">
+              <label>${sz}</label>
+              <input type="number" class="init-size" data-size="${sz}" value="0" min="0">
+            </div>
+          `).join('')}
+        </div>
+        
+        <div class="cat-single-qty" style="display: none; margin-top: 15px;">
+          <label class="input-group" style="margin-bottom:0;">Quantidade Inicial
+            <input type="number" class="init-qty-single" value="0" min="0">
+          </label>
+        </div>
       `;
       document.getElementById('categories-container').appendChild(div);
     }
-    add_category(); 
-
-    function toggle_hat() {
-      document.getElementById('hat_price_div').style.display = document.getElementById('has_hat').checked ? 'block' : 'none';
+    
+    function toggle_sizes(checkbox) {
+      const block = checkbox.closest('.category-setup');
+      const sizesDiv = block.querySelector('.cat-sizes');
+      const singleDiv = block.querySelector('.cat-single-qty');
+      
+      if (checkbox.checked) {
+        sizesDiv.style.display = 'grid';
+        singleDiv.style.display = 'none';
+      } else {
+        sizesDiv.style.display = 'none';
+        singleDiv.style.display = 'block';
+      }
     }
+
+    add_category(); 
 
     function calc_total() {
       const sq = parseFloat(document.getElementById('calc_shirt_qty').value) || 0;
@@ -212,24 +216,29 @@
 
       const data = new FormData(e.target);
       const cats = [];
+      
       document.querySelectorAll('.category-setup').forEach(block => {
+        const has_sizes = block.querySelector('.cat-has-sizes').checked;
         const init_sizes = {};
-        block.querySelectorAll('.init-size').forEach(input => {
-          init_sizes[input.dataset.size] = parseInt(input.value) || 0;
-        });
+        
+        if (has_sizes) {
+          block.querySelectorAll('.init-size').forEach(input => {
+            init_sizes[input.dataset.size] = parseInt(input.value) || 0;
+          });
+        } else {
+          const single_qty = parseInt(block.querySelector('.init-qty-single').value) || 0;
+          init_sizes['Unico'] = single_qty;
+        }
+
         cats.push({
           name: block.querySelector('.cat-name').value,
           price_cents: Math.round(parseFloat(block.querySelector('.cat-price').value) * 100),
+          has_sizes: has_sizes,
           initial_sizes: init_sizes
         });
       });
       
       data.append('categories', JSON.stringify(cats));
-      data.append('has_hat', document.getElementById('has_hat').checked);
-      
-      const hatPrice = parseFloat(document.getElementById('hat_price').value);
-      data.append('hat_price_cents', Math.round((isNaN(hatPrice) ? 0 : hatPrice) * 100));
-      data.append('initial_hat_qty', document.getElementById('hat_initial_qty').value);
 
       const res = await fetch('/api/admin/orders', { method: 'POST', body: data });
       const json = await res.json();
