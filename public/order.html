@@ -132,12 +132,12 @@
         catDiv.className = 'category-block';
         
         if (cat.has_sizes) {
-          // RENDERIZA COMO CAMISA (COM TAMANHOS)
           catDiv.innerHTML = `<h2 class="cat-title">${cat.name}</h2><div class="sizes-grid" id="grid-${index}"></div>`;
           catWrap.appendChild(catDiv);
           
           const grid = catDiv.querySelector('.sizes-grid');
-          ['PP', 'P', 'M', 'G', 'GG', 'XG'].forEach(size => {
+          // ADICIONADO XGG AQUI TAMBÉM
+          ['PP', 'P', 'M', 'G', 'GG', 'XG', 'XGG'].forEach(size => {
             const qty = selection[cat.name][size] || 0;
             const item = document.createElement('div');
             item.className = qty > 0 ? 'size-item active' : 'size-item';
@@ -153,7 +153,6 @@
             grid.appendChild(item);
           });
         } else {
-          // RENDERIZA COMO BONÉ (SEM TAMANHOS)
           const qty = selection[cat.name]['Unico'] || 0;
           catDiv.innerHTML = `
             <h2 class="cat-title">${cat.name}</h2>

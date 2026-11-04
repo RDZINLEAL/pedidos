@@ -48,10 +48,15 @@
             </label>
           </div>
 
-          <label class="input-group file-input">
-            Fotos do Pedido (Selecione quantas quiser)
-            <input name="photos" type="file" accept="image/*" multiple>
-          </label>
+          <div class="file-input" style="background: #1a1a1a; padding: 20px; border-radius: 8px; border: 1px dashed #444; margin-bottom: 25px;">
+            <label style="font-size: 14px; color: #fff; font-weight: bold; display: block; margin-bottom: 10px;">
+              Fotos do Pedido
+            </label>
+            <p style="font-size: 12px; color: #888; margin-bottom: 15px;">
+              Segure a tecla <strong>CTRL</strong> para selecionar várias fotos de uma vez.
+            </p>
+            <input name="photos" type="file" accept="image/*" multiple required style="width: 100%; padding: 10px; background: #050505; border: 1px solid #333; border-radius: 6px; color: #fff;">
+          </div>
 
           <hr class="divider">
 
@@ -121,7 +126,8 @@
   </main>
 
   <script>
-    const sizes = ['PP', 'P', 'M', 'G', 'GG', 'XG'];
+    // ADICIONADO XGG AQUI
+    const sizes = ['PP', 'P', 'M', 'G', 'GG', 'XG', 'XGG'];
 
     function add_category() {
       const div = document.createElement('div');
