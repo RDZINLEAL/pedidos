@@ -17,8 +17,6 @@
   </header>
 
   <main class="admin-main dashboard-grid">
-    
-    <!-- COLUNA ESQUERDA: FORMULÁRIO E TABELA -->
     <div class="main-column">
       <section class="card">
         <div class="card-header">
@@ -39,6 +37,15 @@
             </label>
             <label class="input-group">Telefone / WhatsApp
               <input name="client_phone" placeholder="DDD + Número" required>
+            </label>
+          </div>
+
+          <div class="form-grid">
+            <label class="input-group">Nome do Produto (Ex: Camisa Polo)
+              <input name="product_name" value="Camisa personalizada" required>
+            </label>
+            <label class="input-group">Descrição (Ex: Tecido Dry Fit)
+              <input name="product_description" value="Modelo esportivo" required>
             </label>
           </div>
 
@@ -64,10 +71,15 @@
             </label>
             
             <div id="hat_price_div" class="hat-price-input" style="display:none;">
-              <label class="input-group">Valor do Boné (R$)
-                <input type="number" id="hat_price" name="hat_price" step="0.01" value="35.00">
-              </label>
-              <label class="input-group file-input" style="margin-bottom:0; margin-top:10px;">
+              <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <label class="input-group" style="flex: 1; margin-bottom: 0;">Qtd Inicial de Bonés
+                  <input type="number" id="hat_initial_qty" name="initial_hat_qty" value="0" min="0">
+                </label>
+                <label class="input-group" style="flex: 1; margin-bottom: 0;">Valor do Boné (R$)
+                  <input type="number" id="hat_price" name="hat_price" step="0.01" value="35.00">
+                </label>
+              </div>
+              <label class="input-group file-input" style="margin-bottom:0;">
                 Foto do Boné (Opcional)
                 <input name="hat_photo" type="file" accept="image/*">
               </label>
@@ -101,12 +113,10 @@
       </section>
     </div>
 
-    <!-- COLUNA DIREITA: CALCULADORA -->
     <div class="sidebar-column">
       <div class="card calc-card">
         <div class="card-header">
           <h2>Calculadora Rápida</h2>
-          <p>Faça a conta antes de criar o pedido.</p>
         </div>
         
         <div class="calc-section">
@@ -180,12 +190,11 @@
       const total_shirt = sq * sp;
       const total_hat = hq * hp;
       const total_geral = total_shirt + total_hat;
-      const split = total_geral / 2;
 
       document.getElementById('res_shirt').textContent = `R$ ${total_shirt.toFixed(2).replace('.', ',')}`;
       document.getElementById('res_hat').textContent = `R$ ${total_hat.toFixed(2).replace('.', ',')}`;
       document.getElementById('res_total').textContent = `R$ ${total_geral.toFixed(2).replace('.', ',')}`;
-      document.getElementById('res_split').textContent = `R$ ${split.toFixed(2).replace('.', ',')}`;
+      document.getElementById('res_split').textContent = `R$ ${(total_geral / 2).toFixed(2).replace('.', ',')}`;
     }
 
     async function load_orders() {
@@ -235,8 +244,10 @@
       
       data.append('categories', JSON.stringify(cats));
       data.append('has_hat', document.getElementById('has_hat').checked);
+      
       const hatPrice = parseFloat(document.getElementById('hat_price').value);
       data.append('hat_price_cents', Math.round((isNaN(hatPrice) ? 0 : hatPrice) * 100));
+      data.append('initial_hat_qty', document.getElementById('hat_initial_qty').value);
 
       const res = await fetch('/api/admin/orders', { method: 'POST', body: data });
       const json = await res.json();

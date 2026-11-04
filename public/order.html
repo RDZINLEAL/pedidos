@@ -11,21 +11,17 @@
 <body class="dark-theme">
   <div class="mobile-container">
     
-    <!-- Header -->
     <div class="brand-header">
       <img src="/assets/banner.png" class="top-banner-img">
     </div>
 
-    <!-- Banner de Status (Aguardando Pagamento) -->
     <div class="status-banner" id="status-banner">
       <img src="/assets/Nova pasta/08_status_aguardando_pagamento_transparent.png" alt="Status">
       <span>Aguardando Pagamento</span>
     </div>
 
-    <!-- Conteúdo Dinâmico -->
     <div id="app-content"></div>
 
-    <!-- Rodapé de Suporte -->
     <div class="support-footer" onclick="window.open('https://wa.me/5511927078767', '_blank')">
       <div class="support-left">
         <img src="/assets/Nova pasta/04_suporte_atendimento_transparent.png">
@@ -34,7 +30,6 @@
       <span class="arrow">›</span>
     </div>
 
-    <!-- Modal de Alteração -->
     <div class="modal-overlay" id="modal-alter">
       <div class="modal-box">
         <h3>Atenção</h3>
@@ -72,6 +67,7 @@
               <p style="color:#aaa; margin-top:10px;">Seu pedido já está em produção.</p>
             </div>`;
           document.getElementById('status-banner').style.display = 'none';
+          document.querySelector('.support-footer').style.display = 'none';
         } else if (order.status === 'pending') {
           show_payment_screen(order);
         } else {
@@ -82,11 +78,10 @@
       }
     }
 
-    // ==========================================
-    // TELA 1: PERSONALIZAÇÃO
-    // ==========================================
     function build_customization_ui(order) {
       document.getElementById('status-banner').style.display = 'none'; 
+
+      hatQty = order.initial_hat_qty || 0;
 
       let carousel_html = '';
       let img_count = 0;
@@ -109,8 +104,8 @@
           <div class="summary-left">
             <div class="icon-box"><img src="/assets/Nova pasta/01_selo_seguranca_transparent.png"></div>
             <div>
-              <strong>Camisa personalizada</strong>
-              <span>Modelo esportivo</span>
+              <strong>${order.product_name}</strong>
+              <span>${order.product_description}</span>
             </div>
           </div>
           <div class="summary-right">
@@ -159,10 +154,10 @@
         document.getElementById('hat-wrapper').innerHTML = `
           <div class="category-block">
             <h2 class="cat-title">Boné Personalizado</h2>
-            <div class="size-item" style="width: 100%;">
+            <div class="size-item ${hatQty > 0 ? 'active' : ''}" id="hat-item" style="width: 100%;">
               <span class="size-label" style="font-size: 14px;">Boné <br><small style="color:#facc15;">R$ ${(order.hat_price_cents/100).toFixed(2).replace('.', ',')} cada</small></span>
               <div class="counter">
-                <button onclick="change_hat(-1)">−</button><span id="val-hat">0</span><button onclick="change_hat(1)">+</button>
+                <button onclick="change_hat(-1)">−</button><span id="val-hat">${hatQty}</span><button onclick="change_hat(1)">+</button>
               </div>
             </div>
           </div>
@@ -173,9 +168,6 @@
       update_total();
     }
 
-    // ==========================================
-    // TELA 2: PAGAMENTO PIX (LAYOUT CORRIGIDO)
-    // ==========================================
     function show_payment_screen(order) {
       document.getElementById('status-banner').style.display = 'flex'; 
       const total = (order.total_cents / 100).toFixed(2).replace('.', ',');
@@ -203,7 +195,7 @@
               ${order.photo_path ? `<img src="${order.photo_path}">` : '<div style="background:#222; width:100%; height:100%;"></div>'}
             </div>
             <div class="product-info">
-              <h3 style="font-size: 15px; margin-bottom: 5px; color:#fff;">Camisa Personalizada</h3>
+              <h3 style="font-size: 15px; margin-bottom: 5px; color:#fff;">${order.product_name}</h3>
               <div class="order-items-container">
                 ${items_html}
               </div>
@@ -217,7 +209,6 @@
 
           <hr class="divider">
 
-          <!-- ÁREA PIX -->
           <div class="pix-container">
             <div class="pix-top">
               <div style="display:flex; align-items:center; gap:10px;">
@@ -247,7 +238,6 @@
             <button class="btn-copy-large" onclick="copy_pix()">COPIAR CÓDIGO PIX</button>
           </div>
 
-          <!-- SELOS DE CONFIANÇA -->
           <div class="trust-badges-row">
             <div class="trust-badge"><img src="/assets/Nova pasta/01_selo_seguranca_transparent.png"><span>Compra<br>Segura</span></div>
             <div class="trust-badge"><img src="/assets/Nova pasta/02_pagamento_rapido_transparent.png"><span>Pagamento<br>Rápido</span></div>
@@ -255,7 +245,6 @@
             <div class="trust-badge"><img src="/assets/Nova pasta/04_suporte_atendimento_transparent.png"><span>Suporte<br>Especializado</span></div>
           </div>
 
-          <!-- LINHA DO TEMPO -->
           <div class="timeline-container">
             <h4 style="font-size: 14px; margin-bottom: 20px; color:#fff;">Próximas Etapas</h4>
             <div class="timeline-track">
@@ -281,9 +270,6 @@
       document.getElementById('app-content').innerHTML = html;
     }
 
-    // ==========================================
-    // FUNÇÕES AUXILIARES
-    // ==========================================
     function copy_pix() {
       const txt = document.getElementById('pix-code');
       txt.select();
@@ -334,6 +320,8 @@
       if (delta < 0 && hatQty === 0) return;
       hatQty += delta;
       document.getElementById('val-hat').textContent = hatQty;
+      const parent = document.getElementById('hat-item');
+      if (hatQty > 0) parent.classList.add('active'); else parent.classList.remove('active');
       update_total();
     }
 
@@ -350,6 +338,7 @@
         }
       }
       if (orderData.has_hat && hatQty > 0) totalPriceCents += (orderData.hat_price_cents * hatQty);
+      
       document.getElementById('total-qty').textContent = totalQty;
       document.getElementById('total-price').textContent = `R$ ${(totalPriceCents / 100).toFixed(2).replace('.', ',')}`;
       

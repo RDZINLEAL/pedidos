@@ -51,20 +51,21 @@ app.use(express.static('public'));
 
 app.post('/api/admin/orders', upload, async (req, res) => {
   try {
-    const { client_name, client_email, client_document, client_phone, categories, has_hat, hat_price_cents } = req.body;
+    const { client_name, client_email, client_document, client_phone, categories, has_hat, hat_price_cents, initial_hat_qty, product_name, product_description } = req.body;
     
-    // Pega as imagens se elas existirem
     const photo_path = req.files && req.files['photo'] ? `/uploads/${req.files['photo'][0].filename}` : null;
     const hat_photo_path = req.files && req.files['hat_photo'] ? `/uploads/${req.files['hat_photo'][0].filename}` : null;
     
     const new_order = {
       id: randomBytes(3).toString('hex'),
       client_name, client_email, client_document, client_phone,
-      photo_path,
-      hat_photo_path, // Salva no banco
+      photo_path, hat_photo_path,
+      product_name: product_name || 'Camisa personalizada',
+      product_description: product_description || 'Modelo esportivo',
       available_categories: JSON.parse(categories),
       has_hat: has_hat === 'true',
       hat_price_cents: Number(hat_price_cents) || 0,
+      initial_hat_qty: Number(initial_hat_qty) || 0,
       status: 'draft',
       total_cents: 0
     };
@@ -81,6 +82,8 @@ app.post('/api/orders/:id/checkout', async (req, res) => {
     if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
 
     let total_cents = 0;
+    
+    // Calcula Camisas
     selected_sizes.forEach(sel => {
       const category_info = order.available_categories.find(c => c.name === sel.category);
       if (category_info) {
@@ -90,17 +93,20 @@ app.post('/api/orders/:id/checkout', async (req, res) => {
       }
     });
 
-    if (order.has_hat && hat_quantity > 0) {
-      total_cents += (order.hat_price_cents * hat_quantity);
+    // Calcula Bonés
+    const final_hat_qty = Number(hat_quantity) || 0;
+    if (order.has_hat && final_hat_qty > 0) {
+      total_cents += (order.hat_price_cents * final_hat_qty);
     }
 
     if (total_cents === 0) return res.status(400).json({ error: 'Selecione pelo menos um item.' });
 
-    const tx = await create_transaction({ ...order, total_cents, items: [{ description: 'Pedido Bravus', quantity: 1, unit_price_cents: total_cents }] }, base);
+    // Envia para a Invictus
+    const tx = await create_transaction({ ...order, total_cents, items: [{ description: order.product_name || 'Pedido Bravus', quantity: 1, unit_price_cents: total_cents }] }, base);
     
     await update_order(order.id, {
       selected_sizes,
-      hat_quantity: Number(hat_quantity) || 0,
+      hat_quantity: final_hat_qty,
       total_cents,
       status: 'pending',
       payment_link: tx.payment_link,
@@ -117,6 +123,32 @@ app.get('/api/orders/:id', async (req, res) => {
   const order = await get_order(req.params.id);
   if (!order) return res.status(404).json({ error: 'Não encontrado' });
   res.json({ order });
+});
+
+// WEBHOOK DA INVICTUS CORRIGIDO
+app.post('/api/webhook/invictus', async (req, res) => {
+  try {
+    const { event, transaction } = req.body;
+    const order_id = req.query.order_id;
+
+    if (order_id && transaction && event) {
+      // Verifica o evento de pagamento
+      if (event.includes('CHARGE_PAID')) {
+        await update_order(order_id, { 
+          status: 'paid', 
+          mp_payment_id: transaction.id, 
+          paid_at: new Date().toISOString() 
+        });
+        console.log(`Pagamento confirmado para o pedido ${order_id}`);
+      } else if (event.includes('CHARGE_EXPIRED') || event.includes('CHARGE_REFUND')) {
+        await update_order(order_id, { status: 'rejected' });
+      }
+    }
+    res.sendStatus(200);
+  } catch (err) {
+    console.error('[webhook]', err);
+    res.sendStatus(500);
+  }
 });
 
 app.get('/pagamentoseguro', (_req, res) => res.sendFile(path.resolve('public/order.html')));

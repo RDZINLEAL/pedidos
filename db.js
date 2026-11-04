@@ -13,16 +13,23 @@ const OrderSchema = new mongoose.Schema({
   client_email: String,
   client_document: String,
   client_phone: String,
-  photo_path: String, // Foto da camisa
-  hat_photo_path: String, // FOTO DO BONÉ (NOVO)
+  photo_path: String,
+  hat_photo_path: String,
   payment_link: String,
   mp_payment_id: String,
   status: { type: String, default: 'draft' },
+  
+  product_name: { type: String, default: 'Camisa personalizada' },
+  product_description: { type: String, default: 'Modelo esportivo' },
+
   available_categories: Array,
   selected_sizes: Array,
+  
   has_hat: Boolean,
   hat_price_cents: Number,
+  initial_hat_qty: { type: Number, default: 0 },
   hat_quantity: { type: Number, default: 0 },
+  
   total_cents: Number,
   created_at: { type: Date, default: Date.now },
   paid_at: Date
