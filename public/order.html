@@ -80,12 +80,13 @@
 
     function build_customization_ui(order) {
       document.getElementById('status-banner').style.display = 'none'; 
-      hatQty = order.initial_hat_qty || 0;
+      
+      // PUXA A QUANTIDADE INICIAL DO BANCO DE DADOS
+      hatQty = Number(order.initial_hat_qty) || 0;
 
       let carousel_html = '';
       let img_count = 0;
       
-      // Renderiza todas as fotos que vieram do banco
       if (order.photos && order.photos.length > 0) {
         order.photos.forEach(photo => {
           carousel_html += `<div class="carousel-slide"><img src="${photo}" draggable="false"></div>`;
@@ -128,33 +129,36 @@
       document.getElementById('app-content').innerHTML = html;
 
       const catWrap = document.getElementById('categories-wrapper');
-      order.available_categories.forEach(cat => {
-        selection[cat.name] = cat.initial_sizes ? { ...cat.initial_sizes } : { PP:0, P:0, M:0, G:0, GG:0, XG:0 };
-        
-        const catDiv = document.createElement('div');
-        catDiv.className = 'category-block';
-        catDiv.innerHTML = `<h2 class="cat-title">${cat.name}</h2><div class="sizes-grid" id="grid-${cat.name.replace(/\s/g,'')}"></div>`;
-        catWrap.appendChild(catDiv);
-        
-        const grid = catDiv.querySelector('.sizes-grid');
-        ['PP', 'P', 'M', 'G', 'GG', 'XG'].forEach(size => {
-          const qty = selection[cat.name][size] || 0;
-          const item = document.createElement('div');
-          item.className = qty > 0 ? 'size-item active' : 'size-item';
-          item.id = `item-${cat.name.replace(/\s/g,'')}-${size}`;
-          item.innerHTML = `
-            <span class="size-label">${size}</span>
-            <div class="counter">
-              <button onclick="attempt_change('${cat.name}', '${size}', -1)">−</button>
-              <span id="val-${cat.name.replace(/\s/g,'')}-${size}">${qty}</span>
-              <button onclick="attempt_change('${cat.name}', '${size}', 1)">+</button>
-            </div>
-          `;
-          grid.appendChild(item);
+      if (order.available_categories && order.available_categories.length > 0) {
+        order.available_categories.forEach(cat => {
+          selection[cat.name] = cat.initial_sizes ? { ...cat.initial_sizes } : { PP:0, P:0, M:0, G:0, GG:0, XG:0 };
+          
+          const catDiv = document.createElement('div');
+          catDiv.className = 'category-block';
+          catDiv.innerHTML = `<h2 class="cat-title">${cat.name}</h2><div class="sizes-grid" id="grid-${cat.name.replace(/\s/g,'')}"></div>`;
+          catWrap.appendChild(catDiv);
+          
+          const grid = catDiv.querySelector('.sizes-grid');
+          ['PP', 'P', 'M', 'G', 'GG', 'XG'].forEach(size => {
+            const qty = selection[cat.name][size] || 0;
+            const item = document.createElement('div');
+            item.className = qty > 0 ? 'size-item active' : 'size-item';
+            item.id = `item-${cat.name.replace(/\s/g,'')}-${size}`;
+            item.innerHTML = `
+              <span class="size-label">${size}</span>
+              <div class="counter">
+                <button onclick="attempt_change('${cat.name}', '${size}', -1)">−</button>
+                <span id="val-${cat.name.replace(/\s/g,'')}-${size}">${qty}</span>
+                <button onclick="attempt_change('${cat.name}', '${size}', 1)">+</button>
+              </div>
+            `;
+            grid.appendChild(item);
+          });
         });
-      });
+      }
 
-      if (order.has_hat) {
+      // RENDERIZA O BONÉ (Sempre que tiver quantidade inicial > 0 ou has_hat for true)
+      if (order.has_hat || hatQty > 0) {
         document.getElementById('hat-wrapper').style.display = 'block';
         document.getElementById('hat-wrapper').innerHTML = `
           <div class="category-block">
@@ -177,7 +181,7 @@
       let totalQty = hatQty;
       let totalPriceCents = 0;
       
-      // Soma das Camisas
+      // Camisas
       for (const cat in selection) {
         const catInfo = orderData.available_categories.find(c => c.name === cat);
         const catPrice = catInfo ? catInfo.price_cents : 0;
@@ -188,9 +192,9 @@
         }
       }
       
-      // Soma dos Bonés
+      // Bonés (MATEMÁTICA FORÇADA)
       const hPrice = Number(orderData.hat_price_cents) || 0;
-      if (orderData.has_hat && hatQty > 0) {
+      if (hatQty > 0) {
         totalPriceCents += (hPrice * hatQty);
       }
 
@@ -201,7 +205,6 @@
       if (totalQty > 0) { btn.disabled = false; btn.style.opacity = '1'; } else { btn.disabled = true; btn.style.opacity = '0.5'; }
     }
 
-    // ... O resto do código (change_hat, attempt_change, show_payment_screen) continua igual
     function show_payment_screen(order) {
       document.getElementById('status-banner').style.display = 'flex'; 
       const total = (order.total_cents / 100).toFixed(2).replace('.', ',');

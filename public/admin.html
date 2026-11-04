@@ -21,7 +21,6 @@
       <section class="card">
         <div class="card-header">
           <h2>Novo Pedido</h2>
-          <p>Preencha os dados e as quantidades iniciais.</p>
         </div>
         
         <form id="order-form" enctype="multipart/form-data">
@@ -41,7 +40,7 @@
           </div>
 
           <div class="form-grid">
-            <label class="input-group">Nome do Produto
+            <label class="input-group">Nome do Produto Principal
               <input name="product_name" value="Camisa personalizada" required>
             </label>
             <label class="input-group">Descrição
@@ -49,7 +48,6 @@
             </label>
           </div>
 
-          <!-- MÚLTIPLAS IMAGENS -->
           <label class="input-group file-input">
             Fotos do Pedido (Selecione quantas quiser)
             <input name="photos" type="file" accept="image/*" multiple>
@@ -58,32 +56,32 @@
           <hr class="divider">
 
           <div class="section-title">
-            <h3>Categorias e Tamanhos Iniciais</h3>
+            <h3>Categorias de Camisas (Tamanhos)</h3>
             <button type="button" onclick="add_category()" class="btn-secondary">+ Adicionar Categoria</button>
           </div>
           
           <div id="categories-container" class="categories-list"></div>
 
-          <div class="hat-section">
+          <div class="hat-section" style="background: rgba(250, 204, 21, 0.05); border-color: #facc15;">
             <label class="switch-label">
-              <input type="checkbox" id="has_hat" name="has_hat" onchange="toggle_hat()">
+              <input type="checkbox" id="has_hat" name="has_hat" onchange="toggle_hat()" checked>
               <span class="slider"></span>
-              Incluir Boné neste pedido?
+              <strong>Incluir Boné neste pedido?</strong>
             </label>
             
-            <div id="hat_price_div" class="hat-price-input" style="display:none;">
+            <div id="hat_price_div" class="hat-price-input" style="display:block;">
               <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <label class="input-group" style="flex: 1; margin-bottom: 0;">Qtd Inicial de Bonés
-                  <input type="number" id="hat_initial_qty" name="initial_hat_qty" value="0" min="0">
+                <label class="input-group" style="flex: 1; margin-bottom: 0;">Quantos Bonés no Total?
+                  <input type="number" id="hat_initial_qty" name="initial_hat_qty" value="10" min="0" required>
                 </label>
-                <label class="input-group" style="flex: 1; margin-bottom: 0;">Valor do Boné (R$)
-                  <input type="number" id="hat_price" name="hat_price" step="0.01" value="35.00">
+                <label class="input-group" style="flex: 1; margin-bottom: 0;">Preço de Cada Boné (R$)
+                  <input type="number" id="hat_price" name="hat_price" step="0.01" value="20.00" required>
                 </label>
               </div>
             </div>
           </div>
 
-          <button type="submit" class="btn-primary">Gerar Link de Personalização</button>
+          <button type="submit" class="btn-primary" style="margin-top: 20px;">Gerar Link de Personalização</button>
         </form>
         <p id="result" class="result-msg"></p>
       </section>
@@ -115,30 +113,24 @@
         <div class="card-header">
           <h2>Calculadora Rápida</h2>
         </div>
-        
         <div class="calc-section">
           <h4>Camisas</h4>
           <div class="calc-row">
             <label>Qtd<input type="number" id="calc_shirt_qty" value="0" min="0" oninput="calc_total()"></label>
             <label>Valor Un. (R$)<input type="number" id="calc_shirt_price" value="0.00" step="0.01" oninput="calc_total()"></label>
           </div>
-          <div class="calc-result">Total Camisas: <strong id="res_shirt">R$ 0,00</strong></div>
         </div>
-
         <div class="calc-section" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #27272a;">
           <h4>Bonés</h4>
           <div class="calc-row">
             <label>Qtd<input type="number" id="calc_hat_qty" value="0" min="0" oninput="calc_total()"></label>
             <label>Valor Un. (R$)<input type="number" id="calc_hat_price" value="0.00" step="0.01" oninput="calc_total()"></label>
           </div>
-          <div class="calc-result">Total Bonés: <strong id="res_hat">R$ 0,00</strong></div>
         </div>
-
         <div class="calc-total">
           <span>Total Geral</span>
           <h3 class="yellow-text" id="res_total">R$ 0,00</h3>
         </div>
-
         <div class="calc-split">
           <span>Dividir em 2x</span>
           <h4 id="res_split">R$ 0,00</h4>
@@ -164,8 +156,8 @@
       });
       div.innerHTML = `
         <div class="cat-top">
-          <input type="text" class="cat-name" placeholder="Ex: Gola Polo / Manga Longa" required>
-          <input type="number" class="cat-price" placeholder="Preço (R$)" step="0.01" required>
+          <input type="text" class="cat-name" placeholder="Ex: Gola Polo" required>
+          <input type="number" class="cat-price" placeholder="Preço Un. (R$)" step="0.01" required>
           <button type="button" class="btn-remove" onclick="this.closest('.category-setup').remove()">×</button>
         </div>
         <div class="cat-sizes">${sizes_html}</div>
@@ -183,15 +175,9 @@
       const sp = parseFloat(document.getElementById('calc_shirt_price').value) || 0;
       const hq = parseFloat(document.getElementById('calc_hat_qty').value) || 0;
       const hp = parseFloat(document.getElementById('calc_hat_price').value) || 0;
-
-      const total_shirt = sq * sp;
-      const total_hat = hq * hp;
-      const total_geral = total_shirt + total_hat;
-
-      document.getElementById('res_shirt').textContent = `R$ ${total_shirt.toFixed(2).replace('.', ',')}`;
-      document.getElementById('res_hat').textContent = `R$ ${total_hat.toFixed(2).replace('.', ',')}`;
-      document.getElementById('res_total').textContent = `R$ ${total_geral.toFixed(2).replace('.', ',')}`;
-      document.getElementById('res_split').textContent = `R$ ${(total_geral / 2).toFixed(2).replace('.', ',')}`;
+      const total = (sq * sp) + (hq * hp);
+      document.getElementById('res_total').textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
+      document.getElementById('res_split').textContent = `R$ ${(total / 2).toFixed(2).replace('.', ',')}`;
     }
 
     async function load_orders() {
@@ -208,7 +194,6 @@
       orders.forEach(o => {
         const link = `${window.location.origin}/pagamentoseguro#${o.id}`;
         const statusClass = o.status === 'paid' ? 'status-paid' : (o.status === 'draft' ? 'status-draft' : 'status-pending');
-        
         tbody.innerHTML += `
           <tr>
             <td><strong>${o.id}</strong></td>

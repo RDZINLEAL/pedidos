@@ -14,7 +14,7 @@ const OrderSchema = new mongoose.Schema({
   client_document: String,
   client_phone: String,
   
-  photos: [String], // ARRAY DE IMAGENS
+  photos: [String], 
   
   payment_link: String,
   mp_payment_id: String,
@@ -26,8 +26,8 @@ const OrderSchema = new mongoose.Schema({
   available_categories: Array,
   selected_sizes: Array,
   
-  has_hat: Boolean,
-  hat_price_cents: Number,
+  has_hat: { type: Boolean, default: false },
+  hat_price_cents: { type: Number, default: 0 },
   initial_hat_qty: { type: Number, default: 0 },
   hat_quantity: { type: Number, default: 0 },
   

@@ -26,7 +26,7 @@ const upload = multer({
     if (!/^image\/(jpe?g|png|webp)$/.test(file.mimetype)) return cb(new Error('Apenas imagens'));
     cb(null, true);
   }
-}).array('photos', 10); // Permite até 10 fotos por pedido
+}).array('photos', 10);
 
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
@@ -54,7 +54,9 @@ app.post('/api/admin/orders', (req, res) => {
       const { client_name, client_email, client_document, client_phone, categories, has_hat, hat_price_cents, initial_hat_qty, product_name, product_description } = req.body;
       
       const photos = req.files ? req.files.map(f => `/uploads/${f.filename}`) : [];
-      
+      const parsed_hat_qty = Number(initial_hat_qty) || 0;
+      const parsed_hat_price = Number(hat_price_cents) || 0;
+
       const new_order = {
         id: randomBytes(3).toString('hex'),
         client_name, client_email, client_document, client_phone,
@@ -62,9 +64,10 @@ app.post('/api/admin/orders', (req, res) => {
         product_name: product_name || 'Camisa personalizada',
         product_description: product_description || 'Modelo esportivo',
         available_categories: JSON.parse(categories),
-        has_hat: has_hat === 'true',
-        hat_price_cents: Number(hat_price_cents) || 0,
-        initial_hat_qty: Number(initial_hat_qty) || 0,
+        // TRAVA DE SEGURANÇA: Se tiver qtd de boné, ativa o boné automaticamente
+        has_hat: (parsed_hat_qty > 0) || (has_hat === 'true'),
+        hat_price_cents: parsed_hat_price,
+        initial_hat_qty: parsed_hat_qty,
         status: 'draft',
         total_cents: 0
       };
@@ -85,25 +88,26 @@ app.post('/api/orders/:id/checkout', async (req, res) => {
 
     let total_cents = 0;
     
-    // 1. Calcula Camisas
-    selected_sizes.forEach(sel => {
-      const category_info = order.available_categories.find(c => c.name === sel.category);
-      if (category_info) {
-        for (const [size, qty] of Object.entries(sel.sizes)) {
-          total_cents += (category_info.price_cents * qty);
+    // Soma Camisas
+    if (selected_sizes && selected_sizes.length > 0) {
+      selected_sizes.forEach(sel => {
+        const category_info = order.available_categories.find(c => c.name === sel.category);
+        if (category_info) {
+          for (const [size, qty] of Object.entries(sel.sizes)) {
+            total_cents += (category_info.price_cents * qty);
+          }
         }
-      }
-    });
+      });
+    }
 
-    // 2. Calcula Bonés
+    // Soma Bonés (FORÇADO A CALCULAR SE TIVER QUANTIDADE)
     const final_hat_qty = Number(hat_quantity) || 0;
-    if (order.has_hat && final_hat_qty > 0) {
+    if (final_hat_qty > 0) {
       total_cents += (order.hat_price_cents * final_hat_qty);
     }
 
     if (total_cents === 0) return res.status(400).json({ error: 'Selecione pelo menos um item.' });
 
-    // 3. Envia para a Invictus
     const tx = await create_transaction({ ...order, total_cents, items: [{ description: order.product_name || 'Pedido Bravus', quantity: 1, unit_price_cents: total_cents }] }, base);
     
     await update_order(order.id, {
