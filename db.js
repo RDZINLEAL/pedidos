@@ -13,8 +13,9 @@ const OrderSchema = new mongoose.Schema({
   client_email: String,
   client_document: String,
   client_phone: String,
-  photo_path: String,
-  hat_photo_path: String,
+  
+  photos: [String], // ARRAY DE IMAGENS
+  
   payment_link: String,
   mp_payment_id: String,
   status: { type: String, default: 'draft' },

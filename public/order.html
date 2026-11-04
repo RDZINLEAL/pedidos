@@ -80,13 +80,18 @@
 
     function build_customization_ui(order) {
       document.getElementById('status-banner').style.display = 'none'; 
-
       hatQty = order.initial_hat_qty || 0;
 
       let carousel_html = '';
       let img_count = 0;
-      if (order.photo_path) { carousel_html += `<div class="carousel-slide"><img src="${order.photo_path}" draggable="false"></div>`; img_count++; }
-      if (order.hat_photo_path) { carousel_html += `<div class="carousel-slide"><img src="${order.hat_photo_path}" draggable="false"></div>`; img_count++; }
+      
+      // Renderiza todas as fotos que vieram do banco
+      if (order.photos && order.photos.length > 0) {
+        order.photos.forEach(photo => {
+          carousel_html += `<div class="carousel-slide"><img src="${photo}" draggable="false"></div>`;
+          img_count++;
+        });
+      }
 
       let html = `
         <div class="carousel-container" style="display:${img_count > 0 ? 'block' : 'none'}">
@@ -168,6 +173,35 @@
       update_total();
     }
 
+    function update_total() {
+      let totalQty = hatQty;
+      let totalPriceCents = 0;
+      
+      // Soma das Camisas
+      for (const cat in selection) {
+        const catInfo = orderData.available_categories.find(c => c.name === cat);
+        const catPrice = catInfo ? catInfo.price_cents : 0;
+        for (const size in selection[cat]) {
+          const qty = selection[cat][size];
+          totalQty += qty;
+          totalPriceCents += (catPrice * qty);
+        }
+      }
+      
+      // Soma dos Bonés
+      const hPrice = Number(orderData.hat_price_cents) || 0;
+      if (orderData.has_hat && hatQty > 0) {
+        totalPriceCents += (hPrice * hatQty);
+      }
+
+      document.getElementById('total-qty').textContent = totalQty;
+      document.getElementById('total-price').textContent = `R$ ${(totalPriceCents / 100).toFixed(2).replace('.', ',')}`;
+      
+      const btn = document.getElementById('btn-confirm');
+      if (totalQty > 0) { btn.disabled = false; btn.style.opacity = '1'; } else { btn.disabled = true; btn.style.opacity = '0.5'; }
+    }
+
+    // ... O resto do código (change_hat, attempt_change, show_payment_screen) continua igual
     function show_payment_screen(order) {
       document.getElementById('status-banner').style.display = 'flex'; 
       const total = (order.total_cents / 100).toFixed(2).replace('.', ',');
@@ -184,7 +218,6 @@
 
       const html = `
         <div class="card payment-card">
-          
           <div class="card-header-line">
             <h2 style="font-size: 18px; margin:0; color:#fff;">Resumo do Pedido</h2>
             <span style="font-size: 12px; color: #888;">Pedido #${order.id}</span>
@@ -192,13 +225,11 @@
 
           <div class="product-row">
             <div class="product-img">
-              ${order.photo_path ? `<img src="${order.photo_path}">` : '<div style="background:#222; width:100%; height:100%;"></div>'}
+              ${order.photos && order.photos.length > 0 ? `<img src="${order.photos[0]}">` : '<div style="background:#222; width:100%; height:100%;"></div>'}
             </div>
             <div class="product-info">
               <h3 style="font-size: 15px; margin-bottom: 5px; color:#fff;">${order.product_name}</h3>
-              <div class="order-items-container">
-                ${items_html}
-              </div>
+              <div class="order-items-container">${items_html}</div>
             </div>
           </div>
 
@@ -208,7 +239,6 @@
           </div>
 
           <hr class="divider">
-
           <div class="pix-container">
             <div class="pix-top">
               <div style="display:flex; align-items:center; gap:10px;">
@@ -221,20 +251,15 @@
             </div>
 
             <div class="pix-content">
-              <div class="qr-box">
-                <img src="${qr_url}" alt="QR Code">
-              </div>
+              <div class="qr-box"><img src="${qr_url}"></div>
               <div class="pix-instructions">
-                <p style="font-size: 13px; color: #ddd; line-height: 1.4; margin-bottom: 15px;">
-                  Escaneie o QR Code com o app do seu banco ou copie o código PIX abaixo.
-                </p>
+                <p style="font-size: 13px; color: #ddd; line-height: 1.4; margin-bottom: 15px;">Escaneie o QR Code com o app do seu banco ou copie o código PIX abaixo.</p>
                 <div class="input-copy">
                   <input type="text" id="pix-code" value="${order.payment_link}" readonly>
                   <button onclick="copy_pix()">Copiar</button>
                 </div>
               </div>
             </div>
-
             <button class="btn-copy-large" onclick="copy_pix()">COPIAR CÓDIGO PIX</button>
           </div>
 
@@ -263,88 +288,18 @@
               </div>
             </div>
           </div>
-
         </div>
       `;
-
       document.getElementById('app-content').innerHTML = html;
     }
 
-    function copy_pix() {
-      const txt = document.getElementById('pix-code');
-      txt.select();
-      document.execCommand('copy');
-      alert('Código PIX copiado com sucesso!');
-    }
-
-    function enable_drag_scroll(slider) {
-      let isDown = false; let startX; let scrollLeft;
-      slider.addEventListener('mousedown', (e) => { isDown = true; slider.style.cursor = 'grabbing'; startX = e.pageX - slider.offsetLeft; scrollLeft = slider.scrollLeft; });
-      slider.addEventListener('mouseleave', () => { isDown = false; slider.style.cursor = 'grab'; });
-      slider.addEventListener('mouseup', () => { isDown = false; slider.style.cursor = 'grab'; });
-      slider.addEventListener('mousemove', (e) => {
-        if (!isDown) return; e.preventDefault(); 
-        const x = e.pageX - slider.offsetLeft; const walk = (x - startX) * 2; slider.scrollLeft = scrollLeft - walk;
-      });
-    }
-
-    function attempt_change(cat, size, delta) {
-      if (delta < 0 && selection[cat][size] === 0) return; 
-      if (!modalShown) {
-        pendingChange = { cat, size, delta };
-        document.getElementById('modal-alter').style.display = 'flex';
-      } else {
-        apply_change(cat, size, delta);
-      }
-    }
-
-    function confirm_alter() {
-      if (pendingChange) apply_change(pendingChange.cat, pendingChange.size, pendingChange.delta);
-      modalShown = true; close_alter_modal();
-    }
-
-    function close_alter_modal() {
-      document.getElementById('modal-alter').style.display = 'none';
-      pendingChange = null;
-    }
-
-    function apply_change(cat, size, delta) {
-      selection[cat][size] += delta;
-      document.getElementById(`val-${cat.replace(/\s/g,'')}-${size}`).textContent = selection[cat][size];
-      const parent = document.getElementById(`item-${cat.replace(/\s/g,'')}-${size}`);
-      if (selection[cat][size] > 0) parent.classList.add('active'); else parent.classList.remove('active');
-      update_total();
-    }
-
-    function change_hat(delta) {
-      if (delta < 0 && hatQty === 0) return;
-      hatQty += delta;
-      document.getElementById('val-hat').textContent = hatQty;
-      const parent = document.getElementById('hat-item');
-      if (hatQty > 0) parent.classList.add('active'); else parent.classList.remove('active');
-      update_total();
-    }
-
-    function update_total() {
-      let totalQty = hatQty;
-      let totalPriceCents = 0;
-      for (const cat in selection) {
-        const catInfo = orderData.available_categories.find(c => c.name === cat);
-        const catPrice = catInfo ? catInfo.price_cents : 0;
-        for (const size in selection[cat]) {
-          const qty = selection[cat][size];
-          totalQty += qty;
-          totalPriceCents += (catPrice * qty);
-        }
-      }
-      if (orderData.has_hat && hatQty > 0) totalPriceCents += (orderData.hat_price_cents * hatQty);
-      
-      document.getElementById('total-qty').textContent = totalQty;
-      document.getElementById('total-price').textContent = `R$ ${(totalPriceCents / 100).toFixed(2).replace('.', ',')}`;
-      
-      const btn = document.getElementById('btn-confirm');
-      if (totalQty > 0) { btn.disabled = false; btn.style.opacity = '1'; } else { btn.disabled = true; btn.style.opacity = '0.5'; }
-    }
+    function copy_pix() { const txt = document.getElementById('pix-code'); txt.select(); document.execCommand('copy'); alert('Código PIX copiado com sucesso!'); }
+    function enable_drag_scroll(slider) { let isDown = false; let startX; let scrollLeft; slider.addEventListener('mousedown', (e) => { isDown = true; slider.style.cursor = 'grabbing'; startX = e.pageX - slider.offsetLeft; scrollLeft = slider.scrollLeft; }); slider.addEventListener('mouseleave', () => { isDown = false; slider.style.cursor = 'grab'; }); slider.addEventListener('mouseup', () => { isDown = false; slider.style.cursor = 'grab'; }); slider.addEventListener('mousemove', (e) => { if (!isDown) return; e.preventDefault(); const x = e.pageX - slider.offsetLeft; const walk = (x - startX) * 2; slider.scrollLeft = scrollLeft - walk; }); }
+    function attempt_change(cat, size, delta) { if (delta < 0 && selection[cat][size] === 0) return; if (!modalShown) { pendingChange = { cat, size, delta }; document.getElementById('modal-alter').style.display = 'flex'; } else { apply_change(cat, size, delta); } }
+    function confirm_alter() { if (pendingChange) apply_change(pendingChange.cat, pendingChange.size, pendingChange.delta); modalShown = true; close_alter_modal(); }
+    function close_alter_modal() { document.getElementById('modal-alter').style.display = 'none'; pendingChange = null; }
+    function apply_change(cat, size, delta) { selection[cat][size] += delta; document.getElementById(`val-${cat.replace(/\s/g,'')}-${size}`).textContent = selection[cat][size]; const parent = document.getElementById(`item-${cat.replace(/\s/g,'')}-${size}`); if (selection[cat][size] > 0) parent.classList.add('active'); else parent.classList.remove('active'); update_total(); }
+    function change_hat(delta) { if (delta < 0 && hatQty === 0) return; hatQty += delta; document.getElementById('val-hat').textContent = hatQty; const parent = document.getElementById('hat-item'); if (hatQty > 0) parent.classList.add('active'); else parent.classList.remove('active'); update_total(); }
 
     async function open_confirm_modal() {
       const btn = document.getElementById('btn-confirm');
@@ -363,19 +318,14 @@
           body: JSON.stringify(payload)
         });
 
-        if (res.ok) {
-          location.reload(); 
-        } else {
+        if (res.ok) { location.reload(); } 
+        else {
           const errJson = await res.json().catch(() => ({}));
           alert('Erro ao gerar pagamento: ' + (errJson.error || 'Verifique o painel.'));
           btn.textContent = 'CONFIRMAR E PAGAR';
           btn.disabled = false;
         }
-      } catch (err) {
-        alert('Erro de conexão.');
-        btn.textContent = 'CONFIRMAR E PAGAR';
-        btn.disabled = false;
-      }
+      } catch (err) { alert('Erro de conexão.'); btn.textContent = 'CONFIRMAR E PAGAR'; btn.disabled = false; }
     }
 
     init();
