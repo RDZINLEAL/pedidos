@@ -136,8 +136,8 @@
           catWrap.appendChild(catDiv);
           
           const grid = catDiv.querySelector('.sizes-grid');
-          // ADICIONADO XGG AQUI TAMBÉM
-          ['PP', 'P', 'M', 'G', 'GG', 'XG', 'XGG'].forEach(size => {
+          // TAMANHOS NOVOS AQUI TAMBÉM
+          ['PP', 'P', 'M', 'G', 'GG', 'XG', 'XGG', 'G1', 'G2', 'G3', 'G4', 'G5'].forEach(size => {
             const qty = selection[cat.name][size] || 0;
             const item = document.createElement('div');
             item.className = qty > 0 ? 'size-item active' : 'size-item';

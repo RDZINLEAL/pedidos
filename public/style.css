@@ -38,8 +38,8 @@ body { font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: anti
 .cat-top input[type="text"] { flex: 2; background: #111; border: 1px solid #333; color: #fff; padding: 10px; border-radius: 6px; font-size: 14px; }
 .cat-top input[type="number"] { flex: 1; background: #111; border: 1px solid #333; color: #fff; padding: 10px; border-radius: 6px; font-size: 14px; }
 
-/* GRADE DE TAMANHOS: MUDOU DE 6 PARA 7 COLUNAS */
-.cat-sizes { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
+/* GRADE DE TAMANHOS: 6 COLUNAS PARA CABER OS 12 */
+.cat-sizes { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
 @media (max-width: 600px) { .cat-sizes { grid-template-columns: repeat(4, 1fr); } }
 
 .size-input { display: flex; flex-direction: column; align-items: center; gap: 5px; }
