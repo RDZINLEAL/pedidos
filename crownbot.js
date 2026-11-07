@@ -4,11 +4,11 @@ export async function create_transaction(order, base_url) {
   const api_key = process.env.CROWNBOT_API_KEY;
   if (!api_key) throw new Error('CROWNBOT_API_KEY ausente no .env');
 
+  // O padrão da maioria dos gateways é enviar o valor em centavos
   const body = {
-    amount: order.total_cents,
-    description: order.product_name || `Pedido ${order.id}`,
+    amount: order.total_cents, 
+    description: order.product_name || `Pedido #${order.id}`,
     reference_id: order.id,
-    payment_method: 'pix',
     customer: {
       name: order.client_name,
       email: order.client_email,
@@ -17,13 +17,13 @@ export async function create_transaction(order, base_url) {
     }
   };
 
+  // Adiciona a URL de retorno e webhook apenas se estiver em produção (HTTPS)
   if (base_url.startsWith('https://')) {
     body.return_url = `${base_url}/pagamentoseguro#${order.id}`;
     body.webhook_url = `${base_url}/api/webhook/crownbot`;
   }
 
-  // TENTANDO O ENDPOINT DE PAGAMENTOS
-  const res = await fetch(`${API_BASE}/payments`, {
+  const res = await fetch(`${API_BASE}/pix`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -32,24 +32,30 @@ export async function create_transaction(order, base_url) {
     body: JSON.stringify(body)
   });
 
+  // Lê a resposta como texto primeiro para evitar o erro de HTML
   const textData = await res.text();
   let data;
   
   try {
     data = JSON.parse(textData);
   } catch (e) {
-    throw new Error(`O CrownBot retornou HTML. Status: ${res.status}. URL testada: /payments. Resposta: ${textData.substring(0, 100)}`);
+    throw new Error(`O CrownBot retornou HTML. Status: ${res.status}. Resposta: ${textData.substring(0, 100)}`);
   }
 
   if (!res.ok) {
-    throw new Error(`CrownBot API ${res.status}: ${data.message || JSON.stringify(data)}`);
+    throw new Error(`CrownBot API ${res.status}: ${data.message || data.error || JSON.stringify(data)}`);
   }
 
-  const tx = data.data || data.transaction || data;
-  const pix_code = tx.pix?.qr_code || tx.qr_code || tx.pix_code;
+  // Tenta extrair o código PIX de todas as formas possíveis que a API pode retornar
+  const tx = data.data || data;
+  const pix_code = tx.pix?.qr_code || tx.qr_code || tx.pix_code || tx.copy_paste || tx.qrcode;
+
+  if (!pix_code) {
+    throw new Error(`A API não retornou o código PIX. Resposta recebida: ${textData}`);
+  }
 
   return {
-    transaction_id: tx.id,
+    transaction_id: tx.id || tx.transaction_id,
     payment_link: pix_code
   };
 }

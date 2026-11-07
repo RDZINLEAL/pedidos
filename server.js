@@ -8,7 +8,7 @@ import { randomBytes, randomUUID } from 'crypto';
 import path from 'path';
 import fs from 'fs';
 import { create_order, get_orders, get_order, update_order, delete_all_orders } from './db.js';
-import { create_transaction } from './invictus.js';
+import { create_transaction } from './crownbot.js';
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -21,12 +21,12 @@ const upload = multer({
     destination: 'uploads/',
     filename: (_req, file, cb) => cb(null, `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`)
   }),
-  limits: { fileSize: 8 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (!/^image\/(jpe?g|png|webp)$/.test(file.mimetype)) return cb(new Error('Apenas imagens'));
+    if (!/^image\/(jpe?g|png|webp)$/.test(file.mimetype)) return cb(new Error('Apenas imagens (JPG, PNG, WEBP)'));
     cb(null, true);
   }
-}).array('photos', 10);
+});
 
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
@@ -46,37 +46,33 @@ app.use('/limpar.html', basic_auth);
 app.use('/api/admin', basic_auth);
 app.use(express.static('public'));
 
-app.post('/api/admin/orders', (req, res) => {
-  upload(req, res, async (err) => {
-    if (err) return res.status(400).json({ error: err.message });
+app.post('/api/admin/orders', upload.array('photos', 15), async (req, res) => {
+  try {
+    const { client_name, client_email, client_document, client_phone, categories, product_name, product_description } = req.body;
+    
+    const photos = req.files ? req.files.map(f => `/uploads/${f.filename}`) : [];
 
-    try {
-      const { client_name, client_email, client_document, client_phone, categories, product_name, product_description } = req.body;
-      
-      const photos = req.files ? req.files.map(f => `/uploads/${f.filename}`) : [];
+    const new_order = {
+      id: randomBytes(3).toString('hex'),
+      client_name, client_email, client_document, client_phone,
+      photos,
+      product_name: product_name || 'Camisa personalizada',
+      product_description: product_description || 'Modelo esportivo',
+      available_categories: JSON.parse(categories),
+      status: 'draft',
+      total_cents: 0
+    };
 
-      const new_order = {
-        id: randomBytes(3).toString('hex'),
-        client_name, client_email, client_document, client_phone,
-        photos,
-        product_name: product_name || 'Camisa personalizada',
-        product_description: product_description || 'Modelo esportivo',
-        available_categories: JSON.parse(categories),
-        status: 'draft',
-        total_cents: 0
-      };
-
-      await create_order(new_order);
-      res.json({ order: await get_order(new_order.id) });
-    } catch (error) { 
-      res.status(500).json({ error: error.message }); 
-    }
-  });
+    await create_order(new_order);
+    res.json({ order: await get_order(new_order.id) });
+  } catch (error) { 
+    res.status(500).json({ error: error.message }); 
+  }
 });
 
 app.post('/api/orders/:id/checkout', async (req, res) => {
   try {
-    const { selected_sizes } = req.body; // Agora tudo vem aqui, camisas e bonés
+    const { selected_sizes } = req.body;
     const order = await get_order(req.params.id);
     if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
 
@@ -93,7 +89,8 @@ app.post('/api/orders/:id/checkout', async (req, res) => {
 
     if (total_cents === 0) return res.status(400).json({ error: 'Selecione pelo menos um item.' });
 
-    const tx = await create_transaction({ ...order, total_cents, items: [{ description: order.product_name || 'Pedido Bravus', quantity: 1, unit_price_cents: total_cents }] }, base);
+    // Cria a cobrança no CrownBot
+    const tx = await create_transaction({ ...order, total_cents }, base);
     
     await update_order(order.id, {
       selected_sizes,
@@ -115,20 +112,28 @@ app.get('/api/orders/:id', async (req, res) => {
   res.json({ order });
 });
 
-app.post('/api/webhook/invictus', async (req, res) => {
+// WEBHOOK CROWNBOT (Configurar no painel do CrownBot a URL: https://bravuspersonalizados.com.br/api/webhook/crownbot)
+app.post('/api/webhook/crownbot', async (req, res) => {
   try {
-    const { event, transaction } = req.body;
-    const order_id = req.query.order_id;
+    console.log('Webhook recebido do CrownBot:', JSON.stringify(req.body, null, 2));
+    
+    // O CrownBot pode enviar o id da transação ou a referência externa
+    const payload = req.body;
+    const order_id = payload.reference_id || (payload.data && payload.data.reference_id);
+    const event = payload.event || payload.status;
 
-    if (order_id && transaction && event) {
-      if (event.includes('CHARGE_PAID')) {
-        await update_order(order_id, { status: 'paid', mp_payment_id: transaction.id, paid_at: new Date().toISOString() });
-      } else if (event.includes('CHARGE_EXPIRED') || event.includes('CHARGE_REFUND')) {
+    if (order_id && event) {
+      if (event.includes('paid') || event.includes('approved') || event === 'PAID') {
+        await update_order(order_id, { status: 'paid', mp_payment_id: payload.id || 'crownbot', paid_at: new Date().toISOString() });
+      } else if (event.includes('expired') || event.includes('refused') || event.includes('cancelled')) {
         await update_order(order_id, { status: 'rejected' });
       }
     }
     res.sendStatus(200);
-  } catch (err) { res.sendStatus(500); }
+  } catch (err) { 
+    console.error('Erro no webhook:', err);
+    res.sendStatus(500); 
+  }
 });
 
 app.get('/pagamentoseguro', (_req, res) => res.sendFile(path.resolve('public/order.html')));
