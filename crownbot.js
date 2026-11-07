@@ -22,7 +22,8 @@ export async function create_transaction(order, base_url) {
     body.webhook_url = `${base_url}/api/webhook/crownbot`;
   }
 
-  const res = await fetch(`${API_BASE}/transactions`, {
+  // TENTANDO O ENDPOINT DE PAGAMENTOS
+  const res = await fetch(`${API_BASE}/payments`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -31,7 +32,14 @@ export async function create_transaction(order, base_url) {
     body: JSON.stringify(body)
   });
 
-  const data = await res.json();
+  const textData = await res.text();
+  let data;
+  
+  try {
+    data = JSON.parse(textData);
+  } catch (e) {
+    throw new Error(`O CrownBot retornou HTML. Status: ${res.status}. URL testada: /payments. Resposta: ${textData.substring(0, 100)}`);
+  }
 
   if (!res.ok) {
     throw new Error(`CrownBot API ${res.status}: ${data.message || JSON.stringify(data)}`);
