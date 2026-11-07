@@ -8,7 +8,7 @@ import { randomBytes, randomUUID } from 'crypto';
 import path from 'path';
 import fs from 'fs';
 import { create_order, get_orders, get_order, update_order, delete_all_orders } from './db.js';
-import { create_transaction } from './invictus.js'; // <--- IMPORT DA INVICTUS
+import { create_transaction } from './invictus.js';
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -21,7 +21,7 @@ const upload = multer({
     destination: 'uploads/',
     filename: (_req, file, cb) => cb(null, `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`)
   }),
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB por foto
   fileFilter: (_req, file, cb) => {
     if (!/^image\/(jpe?g|png|webp)$/.test(file.mimetype)) return cb(new Error('Apenas imagens (JPG, PNG, WEBP)'));
     cb(null, true);
@@ -46,6 +46,7 @@ app.use('/limpar.html', basic_auth);
 app.use('/api/admin', basic_auth);
 app.use(express.static('public'));
 
+// AQUI ESTÁ A CORREÇÃO: upload.array aceita até 15 fotos
 app.post('/api/admin/orders', upload.array('photos', 15), async (req, res) => {
   try {
     const { client_name, client_email, client_document, client_phone, categories, product_name, product_description } = req.body;
@@ -55,7 +56,7 @@ app.post('/api/admin/orders', upload.array('photos', 15), async (req, res) => {
     const new_order = {
       id: randomBytes(3).toString('hex'),
       client_name, client_email, client_document, client_phone,
-      photos,
+      photos, // Salva o array de fotos
       product_name: product_name || 'Camisa personalizada',
       product_description: product_description || 'Modelo esportivo',
       available_categories: JSON.parse(categories),
@@ -89,7 +90,7 @@ app.post('/api/orders/:id/checkout', async (req, res) => {
 
     if (total_cents === 0) return res.status(400).json({ error: 'Selecione pelo menos um item.' });
 
-    const tx = await create_transaction({ ...order, total_cents }, base);
+    const tx = await create_transaction({ ...order, total_cents, items: [{ description: order.product_name || 'Pedido Bravus', quantity: 1, unit_price_cents: total_cents }] }, base);
     
     await update_order(order.id, {
       selected_sizes,
@@ -111,7 +112,6 @@ app.get('/api/orders/:id', async (req, res) => {
   res.json({ order });
 });
 
-// WEBHOOK INVICTUS
 app.post('/api/webhook/invictus', async (req, res) => {
   try {
     const { event, transaction } = req.body;
