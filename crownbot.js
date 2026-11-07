@@ -4,16 +4,14 @@ export async function create_transaction(order, base_url) {
   const api_key = process.env.CROWNBOT_API_KEY;
   if (!api_key) throw new Error('CROWNBOT_API_KEY ausente no .env');
 
-  // Garantindo que o valor seja um número inteiro (ex: 1111)
   const valor_centavos = Math.round(Number(order.total_cents));
 
-  // Trava do limite de R$ 2,00 a R$ 100,00
   if (valor_centavos < 200 || valor_centavos > 10000) {
     throw new Error(`O gateway CrownBot tem um limite de R$ 2,00 a R$ 100,00 por transação. O valor do seu pedido é R$ ${(valor_centavos / 100).toFixed(2).replace('.', ',')}.`);
   }
 
   const body = {
-    valor_centavos: valor_centavos, // NOME EXATO QUE A API PEDIU
+    valor_centavos: valor_centavos,
     descricao: order.product_name || `Pedido #${order.id}`,
     referencia: order.id,
     cliente: {
@@ -48,13 +46,14 @@ export async function create_transaction(order, base_url) {
   }
 
   if (!res.ok) {
-    // Se der erro, mostra o erro deles E o que nós enviamos, para descobrir o problema na hora
-    throw new Error(`CrownBot API ${res.status}: ${data.mensagem || data.error || JSON.stringify(data)} | DADOS ENVIADOS: ${JSON.stringify(body)}`);
+    throw new Error(`CrownBot API ${res.status}: ${data.mensagem || data.error || JSON.stringify(data)}`);
   }
 
-  // Extrai o código PIX da resposta
   const tx = data.data || data;
-  const pix_code = tx.pix?.qr_code || tx.qr_code || tx.pix_code || tx.copia_e_cola || tx.qrcode || tx.pix_copia_e_cola;
+  
+  // Separa a imagem do código de texto
+  const qr_image = tx.qr_code_base64 || tx.pix?.imagem || tx.imagem_qrcode;
+  const pix_code = tx.pix_copia_e_cola || tx.qr_code || tx.pix_code || tx.copia_e_cola;
 
   if (!pix_code) {
     throw new Error(`A API não retornou o código PIX. Resposta: ${textData}`);
@@ -62,6 +61,7 @@ export async function create_transaction(order, base_url) {
 
   return {
     transaction_id: tx.id || tx.transaction_id,
-    payment_link: pix_code
+    payment_link: pix_code,
+    qr_image: qr_image // Salvamos a imagem separada
   };
 }
