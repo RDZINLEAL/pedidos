@@ -8,7 +8,7 @@ import { randomBytes, randomUUID } from 'crypto';
 import path from 'path';
 import fs from 'fs';
 import { create_order, get_orders, get_order, update_order, delete_all_orders } from './db.js';
-import { create_transaction } from './crownbot.js';
+import { create_transaction } from './invictus.js'; // <--- IMPORT DA INVICTUS
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -89,7 +89,6 @@ app.post('/api/orders/:id/checkout', async (req, res) => {
 
     if (total_cents === 0) return res.status(400).json({ error: 'Selecione pelo menos um item.' });
 
-    // Cria a cobrança no CrownBot
     const tx = await create_transaction({ ...order, total_cents }, base);
     
     await update_order(order.id, {
@@ -112,28 +111,21 @@ app.get('/api/orders/:id', async (req, res) => {
   res.json({ order });
 });
 
-// WEBHOOK CROWNBOT (Configurar no painel do CrownBot a URL: https://bravuspersonalizados.com.br/api/webhook/crownbot)
-app.post('/api/webhook/crownbot', async (req, res) => {
+// WEBHOOK INVICTUS
+app.post('/api/webhook/invictus', async (req, res) => {
   try {
-    console.log('Webhook recebido do CrownBot:', JSON.stringify(req.body, null, 2));
-    
-    // O CrownBot pode enviar o id da transação ou a referência externa
-    const payload = req.body;
-    const order_id = payload.reference_id || (payload.data && payload.data.reference_id);
-    const event = payload.event || payload.status;
+    const { event, transaction } = req.body;
+    const order_id = req.query.order_id;
 
-    if (order_id && event) {
-      if (event.includes('paid') || event.includes('approved') || event === 'PAID') {
-        await update_order(order_id, { status: 'paid', mp_payment_id: payload.id || 'crownbot', paid_at: new Date().toISOString() });
-      } else if (event.includes('expired') || event.includes('refused') || event.includes('cancelled')) {
+    if (order_id && transaction && event) {
+      if (event.includes('CHARGE_PAID')) {
+        await update_order(order_id, { status: 'paid', mp_payment_id: transaction.id, paid_at: new Date().toISOString() });
+      } else if (event.includes('CHARGE_EXPIRED') || event.includes('CHARGE_REFUND')) {
         await update_order(order_id, { status: 'rejected' });
       }
     }
     res.sendStatus(200);
-  } catch (err) { 
-    console.error('Erro no webhook:', err);
-    res.sendStatus(500); 
-  }
+  } catch (err) { res.sendStatus(500); }
 });
 
 app.get('/pagamentoseguro', (_req, res) => res.sendFile(path.resolve('public/order.html')));

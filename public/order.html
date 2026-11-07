@@ -195,8 +195,10 @@
     function show_payment_screen(order) {
       document.getElementById('status-banner').style.display = 'flex'; 
       const total = (order.total_cents / 100).toFixed(2).replace('.', ',');
-      const qr_url = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(order.payment_link)}`;
       
+      // GERA O QR CODE USANDO A API PADRAO
+      const qr_src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(order.payment_link)}`;
+
       let items_html = '';
       if(order.selected_sizes) {
         order.selected_sizes.forEach(s => {
@@ -242,7 +244,7 @@
             </div>
 
             <div class="pix-content">
-              <div class="qr-box"><img src="${qr_url}"></div>
+              <div class="qr-box"><img src="${qr_src}"></div>
               <div class="pix-instructions">
                 <p style="font-size: 13px; color: #ddd; line-height: 1.4; margin-bottom: 15px;">Escaneie o QR Code com o app do seu banco ou copie o código PIX abaixo.</p>
                 <div class="input-copy">

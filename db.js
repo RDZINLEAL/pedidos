@@ -23,7 +23,7 @@ const OrderSchema = new mongoose.Schema({
   product_name: { type: String, default: 'Camisa personalizada' },
   product_description: { type: String, default: 'Modelo esportivo' },
 
-  available_categories: Array, // Aqui vai entrar TUDO, inclusive o Boné
+  available_categories: Array,
   selected_sizes: Array,
   
   total_cents: Number,
