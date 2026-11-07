@@ -4,11 +4,16 @@ export async function create_transaction(order, base_url) {
   const api_key = process.env.CROWNBOT_API_KEY;
   if (!api_key) throw new Error('CROWNBOT_API_KEY ausente no .env');
 
-  // O padrão da maioria dos gateways é enviar o valor em centavos
+  // Converte de centavos para reais (ex: 15000 -> 150.00)
+  const valor_reais = order.total_cents / 100;
+
   const body = {
-    amount: order.total_cents, 
+    amount: valor_reais, 
+    value: valor_reais, // Alguns gateways usam 'value'
+    price: valor_reais, // Outros usam 'price'
     description: order.product_name || `Pedido #${order.id}`,
-    reference_id: order.id,
+    reference_id: order.id, // Alguns gateways usam 'external_reference'
+    external_reference: order.id,
     customer: {
       name: order.client_name,
       email: order.client_email,
@@ -17,10 +22,10 @@ export async function create_transaction(order, base_url) {
     }
   };
 
-  // Adiciona a URL de retorno e webhook apenas se estiver em produção (HTTPS)
   if (base_url.startsWith('https://')) {
     body.return_url = `${base_url}/pagamentoseguro#${order.id}`;
     body.webhook_url = `${base_url}/api/webhook/crownbot`;
+    body.postback_url = `${base_url}/api/webhook/crownbot`;
   }
 
   const res = await fetch(`${API_BASE}/pix`, {
@@ -32,7 +37,6 @@ export async function create_transaction(order, base_url) {
     body: JSON.stringify(body)
   });
 
-  // Lê a resposta como texto primeiro para evitar o erro de HTML
   const textData = await res.text();
   let data;
   
@@ -43,10 +47,13 @@ export async function create_transaction(order, base_url) {
   }
 
   if (!res.ok) {
+    // Se der erro de valor inválido, tenta enviar o valor em centavos como número inteiro com nome 'value_cents'
+    if (data.error === 'valor_invalido' || data.message === 'valor_invalido') {
+       throw new Error(`A CrownBot recusou o formato do valor. Tente colocar "amount": ${order.total_cents} ou "amount": "${valor_reais}" na documentação. Resposta exata: ${JSON.stringify(data)}`);
+    }
     throw new Error(`CrownBot API ${res.status}: ${data.message || data.error || JSON.stringify(data)}`);
   }
 
-  // Tenta extrair o código PIX de todas as formas possíveis que a API pode retornar
   const tx = data.data || data;
   const pix_code = tx.pix?.qr_code || tx.qr_code || tx.pix_code || tx.copy_paste || tx.qrcode;
 
