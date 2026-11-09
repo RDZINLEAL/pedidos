@@ -8,7 +8,6 @@ import { randomBytes, randomUUID } from 'crypto';
 import path from 'path';
 import fs from 'fs';
 import { create_order, get_orders, get_order, update_order, delete_all_orders } from './db.js';
-// Não importamos mais o módulo de pagamento aqui para esta rota
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -42,12 +41,12 @@ function basic_auth(req, res, next) {
 }
 
 app.use('/admin.html', basic_auth);
-app.use('/manual.html', basic_auth); // Protege a nova página
+app.use('/manual.html', basic_auth); 
 app.use('/limpar.html', basic_auth);
 app.use('/api/admin', basic_auth);
 app.use(express.static('public'));
 
-// --- ROTAS ANTIGAS MANTIDAS ---
+// --- ROTAS ANTIGAS ---
 app.post('/api/admin/orders', upload.array('photos', 15), async (req, res) => {
   try {
     const { client_name, client_email, client_document, client_phone, categories, product_name, product_description } = req.body;
@@ -84,18 +83,13 @@ app.post('/api/orders/:id/checkout', async (req, res) => {
     });
 
     if (total_cents === 0) return res.status(400).json({ error: 'Selecione pelo menos um item.' });
-
-    // AQUI VOCÊ PODE COLOCAR A API DE VOLTA QUANDO QUISER
-    // const tx = await create_transaction({ ...order, total_cents }, base);
-    // await update_order(order.id, { selected_sizes, total_cents, status: 'pending', payment_link: tx.payment_link, mp_preference_id: tx.transaction_id });
-
     res.json({ success: true, message: "Aguardando integração de pagamento." });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // --- NOVAS ROTAS MANUAIS ---
 
-// Cria o pedido manual
+// Cria o pedido manual como "draft"
 app.post('/api/admin/manual-orders', upload.single('qr_image'), async (req, res) => {
   try {
     const { client_name, client_email, amount_reais, pix_code } = req.body;
@@ -107,9 +101,6 @@ app.post('/api/admin/manual-orders', upload.single('qr_image'), async (req, res)
     const total_cents = Math.round(parseFloat(amount_reais) * 100);
     const qr_image_path = `/uploads/${req.file.filename}`;
     
-    // Define a expiração para 10 minutos a partir de agora
-    const expires_at = new Date(Date.now() + 10 * 60 * 1000);
-
     const new_order = {
       id: randomBytes(3).toString('hex'),
       client_name,
@@ -119,10 +110,9 @@ app.post('/api/admin/manual-orders', upload.single('qr_image'), async (req, res)
       total_cents,
       payment_link: pix_code,
       manual_qr_path: qr_image_path,
-      expires_at,
       product_name: 'Pagamento Manual',
       product_description: 'Via PIX',
-      status: 'pending', // Já vai para pendente
+      status: 'draft', // <--- MUDOU PARA DRAFT
       available_categories: [],
       selected_sizes: []
     };
@@ -134,7 +124,23 @@ app.post('/api/admin/manual-orders', upload.single('qr_image'), async (req, res)
   }
 });
 
-// Busca os dados para a tela do cliente manual
+// Cliente clica em "Confirmar" e geramos a expiração de 10 minutos
+app.post('/api/manual-orders/:id/confirm', async (req, res) => {
+  try {
+    const order = await get_order(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
+
+    // Define a expiração para 10 minutos a partir de AGORA
+    const expires_at = new Date(Date.now() + 10 * 60 * 1000);
+
+    await update_order(order.id, { status: 'pending', expires_at });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Busca os dados para a tela do cliente
 app.get('/api/manual-orders/:id', async (req, res) => {
   const order = await get_order(req.params.id);
   if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
@@ -151,8 +157,7 @@ app.get('/api/orders/:id', async (req, res) => {
   res.json({ order });
 });
 
-// Rotas de páginas
 app.get('/pagamentoseguro', (_req, res) => res.sendFile(path.resolve('public/order.html')));
-app.get('/pagamentomanual', (_req, res) => res.sendFile(path.resolve('public/manual_pay.html'))); // NOVA PÁGINA CLIENTE
+app.get('/pagamentomanual', (_req, res) => res.sendFile(path.resolve('public/manual_pay.html')));
 
 app.listen(port, () => console.log(`Rodando em ${base}`));

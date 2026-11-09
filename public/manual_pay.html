@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <title>Pagamento via PIX - Bravus</title>
+  <title>Finalização do Pedido - Bravus</title>
   <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="stylesheet" href="/style.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -15,15 +15,23 @@
       <img src="/assets/banner.png" class="top-banner-img">
     </div>
 
-    <div id="app-content" style="padding: 0 15px;">
-      <div class="loading" style="text-align: center; margin-top: 50px; color: #aaa;">Carregando dados do pagamento...</div>
+    <div id="app-content" style="padding: 0 15px; margin-bottom: 40px;">
+      <div class="loading" style="text-align: center; margin-top: 50px; color: #aaa;">Carregando dados do pedido...</div>
+    </div>
+
+    <div class="support-footer" onclick="window.open('https://wa.me/5511927078767', '_blank')">
+      <div class="support-left">
+        <img src="/assets/Nova pasta/04_suporte_atendimento_transparent.png">
+        <span>Precisa de ajuda? Fale com nossa equipe.</span>
+      </div>
+      <span class="arrow">›</span>
     </div>
 
   </div>
 
   <script>
     const id = window.location.hash ? window.location.hash.replace('#', '') : window.location.pathname.split('/').pop();
-    let timerInterval;
+    let timerInterval = null;
 
     async function init() {
       if (!id) return;
@@ -39,42 +47,101 @@
               <h2 class="yellow-text">Pagamento Confirmado!</h2>
               <p style="color:#aaa; margin-top:10px;">Seu pedido já está em produção.</p>
             </div>`;
+          document.querySelector('.support-footer').style.display = 'none';
           return;
         }
 
-        render_payment(order);
+        if (order.status === 'draft') {
+          build_review_ui(order);
+        } else if (order.status === 'pending') {
+          build_payment_ui(order);
+        }
 
       } catch (err) {
         document.getElementById('app-content').innerHTML = `<h1 style="color:white;text-align:center;margin-top:50px;">${err.message}</h1>`;
       }
     }
 
-    function render_payment(order) {
+    // TELA 1: CONFERÊNCIA
+    function build_review_ui(order) {
+      const total = (order.total_cents / 100).toFixed(2).replace('.', ',');
+
+      const html = `
+        <div class="card payment-card" style="margin-top: 10px;">
+          <div class="card-header-line">
+            <h2 style="font-size: 18px; margin:0; color:#fff;">Confira seu Pedido</h2>
+            <span style="font-size: 12px; color: #888;">Pedido #${order.id}</span>
+          </div>
+
+          <div class="product-row" style="margin-bottom: 20px; flex-direction: column; align-items: flex-start; gap: 10px;">
+            <div class="product-info" style="width: 100%;">
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 10px;">
+                <span style="color: #aaa;">Cliente:</span>
+                <strong style="color: #fff;">${order.client_name}</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 10px;">
+                <span style="color: #aaa;">Produto:</span>
+                <strong style="color: #fff;">${order.product_name}</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="total-line" style="border-top: 1px solid #333; padding-top: 15px;">
+            <span style="color: #fff; font-weight: bold; font-size: 16px;">Total a pagar</span>
+            <h2 class="yellow-text" style="font-size: 24px; margin:0;">R$ ${total}</h2>
+          </div>
+
+          <button class="btn-confirm" id="btn-confirm" onclick="confirm_order()" style="margin-top: 20px;">CONFIRMAR E PAGAR</button>
+          <p class="secure-text" style="text-align: center; font-size: 12px; color: #888; margin-top: 10px;">🔒 Você será direcionado para o pagamento.</p>
+        </div>
+      `;
+
+      document.getElementById('app-content').innerHTML = html;
+    }
+
+    async function confirm_order() {
+      const btn = document.getElementById('btn-confirm');
+      btn.textContent = 'GERANDO PAGAMENTO...';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch(`/api/manual-orders/${id}/confirm`, { method: 'POST' });
+        if (res.ok) {
+          location.reload(); // Recarrega para cair na tela de pagamento
+        } else {
+          alert('Erro ao confirmar o pedido. Tente novamente.');
+          btn.textContent = 'CONFIRMAR E PAGAR';
+          btn.disabled = false;
+        }
+      } catch (err) {
+        alert('Erro de conexão.');
+        btn.textContent = 'CONFIRMAR E PAGAR';
+        btn.disabled = false;
+      }
+    }
+
+    // TELA 2: PAGAMENTO (COM TIMER)
+    function build_payment_ui(order) {
       const total = (order.total_cents / 100).toFixed(2).replace('.', ',');
       const expires_at = new Date(order.expires_at).getTime();
 
       const html = `
         <div class="card payment-card" style="margin-top: 10px;">
           <div class="card-header-line">
-            <h2 style="font-size: 18px; margin:0; color:#fff;">Pagamento Manual</h2>
+            <h2 style="font-size: 18px; margin:0; color:#fff;">Pagamento via PIX</h2>
             <span style="font-size: 12px; color: #888;">Pedido #${order.id}</span>
           </div>
 
-          <div class="product-row" style="margin-bottom: 20px;">
-            <div class="product-info">
-              <h3 style="font-size: 15px; margin-bottom: 5px; color:#fff;">Cliente: ${order.client_name}</h3>
-              <div class="total-line" style="border:none; padding:0; margin-top:5px;">
-                <span style="color:#aaa; font-size:14px;">Total a pagar:</span>
-                <h2 class="yellow-text" style="font-size: 22px; margin:0;">R$ ${total}</h2>
-              </div>
-            </div>
+          <div class="total-line" style="border-top: none; padding-top: 0; margin-bottom: 20px;">
+            <span style="color: #aaa; font-size: 14px;">Total a pagar:</span>
+            <h2 class="yellow-text" style="font-size: 22px; margin:0;">R$ ${total}</h2>
           </div>
 
           <div class="pix-container">
             <div class="pix-top" style="border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 15px;">
               <div style="display:flex; align-items:center; gap:10px;">
                 <img src="/assets/Nova pasta/01_selo_seguranca_transparent.png" style="width: 30px;">
-                <h3 style="font-size: 16px; margin:0; color:#fff;">Pague com PIX</h3>
+                <h3 style="font-size: 16px; margin:0; color:#fff;">Escaneie o QR Code</h3>
               </div>
               <div id="timer-display" style="font-size: 14px; font-weight: bold; color: #facc15; background: #222; padding: 4px 10px; border-radius: 6px;">
                 10:00
@@ -88,16 +155,13 @@
             </div>
 
             <div class="pix-instructions" style="margin-top: 20px;">
-              <p style="font-size: 13px; color: #ddd; text-align: center; margin-bottom: 10px;">
-                Escaneie o QR Code ou copie o código abaixo.
-              </p>
               <div class="input-copy" style="height: 44px;">
                 <input type="text" id="pix-code" value="${order.payment_link}" readonly style="font-size: 13px;">
                 <button onclick="copy_pix()" style="background:#facc15; color:#000; font-weight:bold;">Copiar</button>
               </div>
             </div>
 
-            <button class="btn-copy-large" onclick="copy_pix()" style="background: #222; color: #fff; border: 1px solid #facc15; margin-top: 10px;">COPIAR CÓDIGO PIX</button>
+            <button class="btn-copy-large" id="btn-copy-large" onclick="copy_pix()" style="background: #222; color: #fff; border: 1px solid #facc15; margin-top: 10px;">COPIAR CÓDIGO PIX</button>
           </div>
         </div>
       `;
@@ -108,6 +172,8 @@
 
     function start_timer(expires_at) {
       const display = document.getElementById('timer-display');
+      const btn = document.getElementById('btn-copy-large');
+      const input_pix = document.getElementById('pix-code');
       
       timerInterval = setInterval(() => {
         const now = new Date().getTime();
@@ -119,13 +185,12 @@
           display.style.color = "#ef4444";
           display.style.background = "rgba(239, 68, 68, 0.1)";
           
-          // Opcional: Desabilitar botões de cópia se expirar
-          const btn = document.querySelector('.btn-copy-large');
           if (btn) {
              btn.disabled = true;
              btn.textContent = "PIX EXPIRADO";
              btn.style.opacity = 0.5;
           }
+          if (input_pix) input_pix.value = "PIX Expirado. Gere um novo pedido.";
           return;
         }
 
@@ -135,14 +200,14 @@
         display.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         
         if (distance < 60000) {
-          display.style.color = "#ef4444"; // Fica vermelho no último minuto
+          display.style.color = "#ef4444";
         }
       }, 1000);
     }
     
     function copy_pix() {
       const txt = document.getElementById('pix-code');
-      if(!txt.value) return;
+      if(!txt.value || txt.value.includes("Expirado")) return;
       txt.select();
       document.execCommand('copy');
       alert('Código PIX copiado com sucesso!');
