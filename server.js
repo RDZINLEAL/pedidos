@@ -22,7 +22,7 @@ const upload = multer({
   }),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (!/^image\/(jpe?g|png|webp)$/.test(file.mimetype)) return cb(new Error('Apenas imagens (JPG, PNG, WEBP)'));
+    if (!/^image\/(jpe?g|png|webp)$/.test(file.mimetype)) return cb(new Error('Apenas imagens'));
     cb(null, true);
   }
 });
@@ -46,61 +46,19 @@ app.use('/limpar.html', basic_auth);
 app.use('/api/admin', basic_auth);
 app.use(express.static('public'));
 
-// --- ROTAS ANTIGAS ---
-app.post('/api/admin/orders', upload.array('photos', 15), async (req, res) => {
+// Cria o pedido manual
+app.post('/api/admin/manual-orders', upload.fields([{ name: 'photos', maxCount: 15 }, { name: 'qr_image', maxCount: 1 }]), async (req, res) => {
   try {
-    const { client_name, client_email, client_document, client_phone, categories, product_name, product_description } = req.body;
-    const photos = req.files ? req.files.map(f => `/uploads/${f.filename}`) : [];
-    const new_order = {
-      id: randomBytes(3).toString('hex'),
-      client_name, client_email, client_document, client_phone,
-      photos,
-      product_name: product_name || 'Camisa personalizada',
-      product_description: product_description || 'Modelo esportivo',
-      available_categories: JSON.parse(categories),
-      status: 'draft',
-      total_cents: 0
-    };
-    await create_order(new_order);
-    res.json({ order: await get_order(new_order.id) });
-  } catch (error) { res.status(500).json({ error: error.message }); }
-});
-
-app.post('/api/orders/:id/checkout', async (req, res) => {
-  try {
-    const { selected_sizes } = req.body;
-    const order = await get_order(req.params.id);
-    if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
-
-    let total_cents = 0;
-    selected_sizes.forEach(sel => {
-      const category_info = order.available_categories.find(c => c.name === sel.category);
-      if (category_info) {
-        for (const [size, qty] of Object.entries(sel.sizes)) {
-          total_cents += (category_info.price_cents * qty);
-        }
-      }
-    });
-
-    if (total_cents === 0) return res.status(400).json({ error: 'Selecione pelo menos um item.' });
-    res.json({ success: true, message: "Aguardando integração de pagamento." });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// --- NOVAS ROTAS MANUAIS ---
-
-// Cria o pedido manual como "draft"
-app.post('/api/admin/manual-orders', upload.single('qr_image'), async (req, res) => {
-  try {
-    const { client_name, client_email, amount_reais, pix_code } = req.body;
+    const { client_name, client_email, amount_reais, pix_code, categories, product_name, product_description } = req.body;
     
-    if (!client_name || !amount_reais || !pix_code || !req.file) {
-      return res.status(400).json({ error: 'Preencha todos os campos e envie o QR Code.' });
+    if (!client_name || !amount_reais || !pix_code || !req.files['qr_image']) {
+      return res.status(400).json({ error: 'Preencha os dados e envie o QR Code.' });
     }
 
+    const photos = req.files['photos'] ? req.files['photos'].map(f => `/uploads/${f.filename}`) : [];
+    const manual_qr_path = `/uploads/${req.files['qr_image'][0].filename}`;
     const total_cents = Math.round(parseFloat(amount_reais) * 100);
-    const qr_image_path = `/uploads/${req.file.filename}`;
-    
+
     const new_order = {
       id: randomBytes(3).toString('hex'),
       client_name,
@@ -109,11 +67,12 @@ app.post('/api/admin/manual-orders', upload.single('qr_image'), async (req, res)
       client_phone: '00000000000',
       total_cents,
       payment_link: pix_code,
-      manual_qr_path: qr_image_path,
-      product_name: 'Pagamento Manual',
-      product_description: 'Via PIX',
-      status: 'draft', // <--- MUDOU PARA DRAFT
-      available_categories: [],
+      manual_qr_path,
+      photos,
+      product_name: product_name || 'Pedido Manual',
+      product_description: product_description || 'Personalizado',
+      available_categories: JSON.parse(categories),
+      status: 'draft',
       selected_sizes: []
     };
 
@@ -124,40 +83,33 @@ app.post('/api/admin/manual-orders', upload.single('qr_image'), async (req, res)
   }
 });
 
-// Cliente clica em "Confirmar" e geramos a expiração de 10 minutos
+// Cliente clica em "Confirmar" -> Define expiração
 app.post('/api/manual-orders/:id/confirm', async (req, res) => {
   try {
     const order = await get_order(req.params.id);
     if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
 
-    // Define a expiração para 10 minutos a partir de AGORA
     const expires_at = new Date(Date.now() + 10 * 60 * 1000);
-
     await update_order(order.id, { status: 'pending', expires_at });
+    
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Busca os dados para a tela do cliente
 app.get('/api/manual-orders/:id', async (req, res) => {
   const order = await get_order(req.params.id);
   if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
   res.json({ order });
 });
 
-// --- FIM DAS ROTAS MANUAIS ---
-
-app.get('/api/admin/orders', async (_req, res) => res.json({ orders: await get_orders() }));
-app.delete('/api/admin/orders', async (req, res) => { await delete_all_orders(); res.json({ success: true }); });
-app.get('/api/orders/:id', async (req, res) => {
+// Busca os dados para a tela do cliente manual
+app.get('/api/manual-orders/:id', async (req, res) => {
   const order = await get_order(req.params.id);
-  if (!order) return res.status(404).json({ error: 'Não encontrado' });
+  if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
   res.json({ order });
 });
 
-app.get('/pagamentoseguro', (_req, res) => res.sendFile(path.resolve('public/order.html')));
 app.get('/pagamentomanual', (_req, res) => res.sendFile(path.resolve('public/manual_pay.html')));
-
 app.listen(port, () => console.log(`Rodando em ${base}`));

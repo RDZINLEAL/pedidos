@@ -15,35 +15,63 @@
     </div>
   </header>
 
-  <main class="admin-main" style="max-width: 600px;">
+  <main class="admin-main" style="max-width: 800px;">
     <section class="card">
       <div class="card-header">
         <h2>Criar Pedido Manual</h2>
-        <p>Gere o PIX no seu banco e insira os dados abaixo.</p>
+        <p>Monte o pedido, adicione as fotos e o PIX gerado pelo seu banco.</p>
       </div>
 
       <form id="manual-form" enctype="multipart/form-data">
-        <label class="input-group">Nome do Cliente
-          <input name="client_name" placeholder="Ex: João Silva" required>
-        </label>
-        
-        <label class="input-group">E-mail (Opcional)
-          <input name="client_email" type="email" placeholder="joao@email.com">
+        <div class="form-grid">
+          <label class="input-group">Nome do Cliente
+            <input name="client_name" placeholder="Ex: João Silva" required>
+          </label>
+          <label class="input-group">E-mail (Opcional)
+            <input name="client_email" type="email" placeholder="joao@email.com">
+          </label>
+        </div>
+
+        <div class="form-grid">
+          <label class="input-group">Nome do Produto
+            <input name="product_name" value="Camisa personalizada" required>
+          </label>
+          <label class="input-group">Descrição
+            <input name="product_description" value="Modelo esportivo" required>
+          </label>
+        </div>
+
+        <label class="input-group file-input">Fotos do Pedido (Segure CTRL para várias)
+          <input name="photos" type="file" accept="image/*" multiple required>
         </label>
 
-        <label class="input-group">Valor Total (R$)
-          <input name="amount_reais" type="number" step="0.01" placeholder="Ex: 150.00" required>
-        </label>
+        <hr class="divider">
+
+        <div class="section-title">
+          <h3>Categorias e Tamanhos</h3>
+          <button type="button" onclick="add_category()" class="btn-secondary">+ Adicionar Categoria</button>
+        </div>
+        
+        <div id="categories-container" class="categories-list"></div>
+
+        <hr class="divider">
+
+        <h3 style="color: #facc15; margin-bottom: 15px;">Dados do PIX Manual</h3>
+        
+        <div class="form-grid">
+          <label class="input-group">Valor Total (R$) - Preenchido Manualmente
+            <input name="amount_reais" type="number" step="0.01" required style="background: #222; border-color: #facc15;">
+          </label>
+          <label class="input-group">Foto do QR Code (Print do banco)
+            <input type="file" name="qr_image" accept="image/*" required>
+          </label>
+        </div>
 
         <label class="input-group">PIX Copia e Cola
-          <textarea name="pix_code" rows="3" placeholder="Cole aqui o código PIX gerado no seu banco" required style="background: #1a1a1a; border: 1px solid #333; color: #fff; padding: 12px; border-radius: 8px; font-family: inherit; font-size: 14px; resize: vertical;"></textarea>
+          <textarea name="pix_code" rows="3" required placeholder="Cole o código PIX do seu banco" style="background: #1a1a1a; border: 1px solid #333; color: #fff; padding: 12px; border-radius: 8px; resize: vertical;"></textarea>
         </label>
 
-        <label class="input-group">Foto do QR Code (Print do seu banco)
-          <input type="file" name="qr_image" accept="image/*" required>
-        </label>
-
-        <button type="submit" class="btn-primary" style="margin-top: 20px;">Gerar Link de Pagamento (10 min)</button>
+        <button type="submit" class="btn-primary" style="margin-top: 20px;">Gerar Link do Cliente</button>
       </form>
       
       <p id="result" style="margin-top: 15px; font-size: 14px; word-break: break-all;"></p>
@@ -51,6 +79,51 @@
   </main>
 
   <script>
+    const sizes = ['PP', 'P', 'M', 'G', 'GG', 'XG', 'XGG', 'G1', 'G2', 'G3', 'G4', 'G5'];
+
+    function add_category() {
+      const div = document.createElement('div');
+      div.className = 'category-setup';
+      
+      div.innerHTML = `
+        <div class="cat-top" style="flex-direction: column; gap: 10px; align-items: stretch;">
+          <div style="display: flex; gap: 10px;">
+            <input type="text" class="cat-name" placeholder="Ex: Camisa Polo ou Boné" required style="flex: 2;">
+            <input type="number" class="cat-price" placeholder="Preço Un. (R$)" step="0.01" required style="flex: 1;">
+            <button type="button" class="btn-remove" onclick="this.closest('.category-setup').remove()">×</button>
+          </div>
+          <label class="switch-label" style="font-size: 13px;">
+            <input type="checkbox" class="cat-has-sizes" checked onchange="toggle_sizes(this)">
+            Esta categoria tem tamanhos?
+          </label>
+        </div>
+        
+        <div class="cat-sizes" style="margin-top: 15px;">
+          ${sizes.map(sz => `
+            <div class="size-input">
+              <label>${sz}</label>
+              <input type="number" class="init-size" data-size="${sz}" value="0" min="0">
+            </div>
+          `).join('')}
+        </div>
+        
+        <div class="cat-single-qty" style="display: none; margin-top: 15px;">
+          <label class="input-group" style="margin-bottom:0;">Quantidade Inicial
+            <input type="number" class="init-qty-single" value="0" min="0">
+          </label>
+        </div>
+      `;
+      document.getElementById('categories-container').appendChild(div);
+    }
+    
+    function toggle_sizes(checkbox) {
+      const block = checkbox.closest('.category-setup');
+      block.querySelector('.cat-sizes').style.display = checkbox.checked ? 'grid' : 'none';
+      block.querySelector('.cat-single-qty').style.display = checkbox.checked ? 'none' : 'block';
+    }
+
+    add_category();
+
     document.getElementById('manual-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const btn = e.target.querySelector('button');
@@ -58,6 +131,29 @@
       btn.disabled = true;
 
       const data = new FormData(e.target);
+      const cats = [];
+      
+      document.querySelectorAll('.category-setup').forEach(block => {
+        const has_sizes = block.querySelector('.cat-has-sizes').checked;
+        const init_sizes = {};
+        
+        if (has_sizes) {
+          block.querySelectorAll('.init-size').forEach(input => {
+            init_sizes[input.dataset.size] = parseInt(input.value) || 0;
+          });
+        } else {
+          init_sizes['Unico'] = parseInt(block.querySelector('.init-qty-single').value) || 0;
+        }
+
+        cats.push({
+          name: block.querySelector('.cat-name').value,
+          price_cents: Math.round(parseFloat(block.querySelector('.cat-price').value) * 100),
+          has_sizes: has_sizes,
+          initial_sizes: init_sizes
+        });
+      });
+      
+      data.append('categories', JSON.stringify(cats));
       
       try {
         const res = await fetch('/api/admin/manual-orders', { method: 'POST', body: data });
@@ -69,6 +165,8 @@
           out.innerHTML = `✅ Pedido criado! <br><br> <strong>Link do cliente:</strong><br> <a href="${link}" target="_blank" style="color: #facc15;">${link}</a>`;
           out.style.color = '#22c55e';
           e.target.reset();
+          document.getElementById('categories-container').innerHTML = '';
+          add_category();
         } else {
           out.textContent = '❌ Erro: ' + json.error;
           out.style.color = '#ef4444';
@@ -78,7 +176,7 @@
         document.getElementById('result').style.color = '#ef4444';
       }
       
-      btn.textContent = 'Gerar Link de Pagamento (10 min)';
+      btn.textContent = 'Gerar Link do Cliente';
       btn.disabled = false;
     });
   </script>

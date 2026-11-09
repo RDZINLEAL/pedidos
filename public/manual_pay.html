@@ -15,8 +15,13 @@
       <img src="/assets/banner.png" class="top-banner-img">
     </div>
 
-    <div id="app-content" style="padding: 0 15px; margin-bottom: 40px;">
-      <div class="loading" style="text-align: center; margin-top: 50px; color: #aaa;">Carregando dados do pedido...</div>
+    <div class="status-banner" id="status-banner" style="display: none;">
+      <img src="/assets/Nova pasta/08_status_aguardando_pagamento_transparent.png" alt="Status">
+      <span>Aguardando Pagamento</span>
+    </div>
+
+    <div id="app-content" style="margin-bottom: 40px;">
+      <div class="loading" style="text-align: center; margin-top: 50px; color: #aaa;">Carregando...</div>
     </div>
 
     <div class="support-footer" onclick="window.open('https://wa.me/5511927078767', '_blank')">
@@ -27,10 +32,25 @@
       <span class="arrow">›</span>
     </div>
 
+    <div class="modal-overlay" id="modal-alter">
+      <div class="modal-box">
+        <h3>Atenção</h3>
+        <p>Você está prestes a alterar a quantidade. Deseja prosseguir?</p>
+        <div class="modal-btns">
+          <button class="btn-cancel" onclick="close_alter_modal()">Cancelar</button>
+          <button class="btn-ok" onclick="confirm_alter()">Sim, alterar</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <script>
     const id = window.location.hash ? window.location.hash.replace('#', '') : window.location.pathname.split('/').pop();
+    let orderData = null;
+    let selection = {}; 
+    let pendingChange = null; 
+    let modalShown = false; 
     let timerInterval = null;
 
     async function init() {
@@ -40,6 +60,7 @@
         if (!res.ok) throw new Error('Pedido não encontrado');
         
         const { order } = await res.json();
+        orderData = order;
         
         if (order.status === 'paid') {
           document.getElementById('app-content').innerHTML = `
@@ -62,66 +83,105 @@
       }
     }
 
-    // TELA 1: CONFERÊNCIA
+    // TELA 1: CONFERÊNCIA (Fotos e Tamanhos)
     function build_review_ui(order) {
-      const total = (order.total_cents / 100).toFixed(2).replace('.', ',');
+      document.getElementById('status-banner').style.display = 'none';
 
-      const html = `
-        <div class="card payment-card" style="margin-top: 10px;">
-          <div class="card-header-line">
-            <h2 style="font-size: 18px; margin:0; color:#fff;">Confira seu Pedido</h2>
-            <span style="font-size: 12px; color: #888;">Pedido #${order.id}</span>
-          </div>
+      let carousel_html = '';
+      let img_count = 0;
+      
+      if (order.photos && order.photos.length > 0) {
+        order.photos.forEach(photo => {
+          carousel_html += `<div class="carousel-slide"><img src="${photo}" draggable="false"></div>`;
+          img_count++;
+        });
+      }
 
-          <div class="product-row" style="margin-bottom: 20px; flex-direction: column; align-items: flex-start; gap: 10px;">
-            <div class="product-info" style="width: 100%;">
-              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 10px;">
-                <span style="color: #aaa;">Cliente:</span>
-                <strong style="color: #fff;">${order.client_name}</strong>
-              </div>
-              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 10px;">
-                <span style="color: #aaa;">Produto:</span>
-                <strong style="color: #fff;">${order.product_name}</strong>
-              </div>
+      let html = `
+        <div class="carousel-container" style="display:${img_count > 0 ? 'block' : 'none'}">
+          <div class="carousel-track" id="carousel">${carousel_html}</div>
+          <div id="carousel-hint" style="display:${img_count > 1 ? 'block' : 'none'}; text-align:center; font-size:11px; color:#facc15; padding:5px; background:rgba(0,0,0,0.5);">← Deslize para o lado →</div>
+        </div>
+
+        <h1 class="title-main" style="text-align: center; margin-top:20px;">Confira seu <span class="yellow-text">Pedido</span></h1>
+        <p class="subtitle" style="text-align: center; color: #aaa; margin-bottom:20px;">Ajuste os tamanhos se necessário.</p>
+
+        <div id="categories-wrapper"></div>
+
+        <div class="summary-box">
+          <div class="summary-left">
+            <div class="icon-box"><img src="/assets/Nova pasta/01_selo_seguranca_transparent.png"></div>
+            <div>
+              <strong>${order.product_name}</strong>
+              <span>${order.product_description}</span>
             </div>
           </div>
-
-          <div class="total-line" style="border-top: 1px solid #333; padding-top: 15px;">
-            <span style="color: #fff; font-weight: bold; font-size: 16px;">Total a pagar</span>
-            <h2 class="yellow-text" style="font-size: 24px; margin:0;">R$ ${total}</h2>
+          <div class="summary-right">
+            <span>Quantidade total</span>
+            <strong class="yellow-text" id="total-qty">0</strong>
+            <span style="margin-top:5px;">Valor Total</span>
+            <strong class="yellow-text" id="total-price" style="font-size:18px;">R$ 0,00</strong>
           </div>
-
-          <button class="btn-confirm" id="btn-confirm" onclick="confirm_order()" style="margin-top: 20px;">CONFIRMAR E PAGAR</button>
-          <p class="secure-text" style="text-align: center; font-size: 12px; color: #888; margin-top: 10px;">🔒 Você será direcionado para o pagamento.</p>
         </div>
+
+        <button class="btn-confirm" id="btn-confirm" onclick="confirm_order()" disabled>CONFIRMAR E PAGAR</button>
+        <p class="secure-text" style="text-align: center; margin-bottom:20px;">🔒 Você poderá revisar antes do pagamento.</p>
       `;
 
       document.getElementById('app-content').innerHTML = html;
-    }
 
-    async function confirm_order() {
-      const btn = document.getElementById('btn-confirm');
-      btn.textContent = 'GERANDO PAGAMENTO...';
-      btn.disabled = true;
-
-      try {
-        const res = await fetch(`/api/manual-orders/${id}/confirm`, { method: 'POST' });
-        if (res.ok) {
-          location.reload(); // Recarrega para cair na tela de pagamento
+      const catWrap = document.getElementById('categories-wrapper');
+      
+      order.available_categories.forEach((cat, index) => {
+        selection[cat.name] = cat.initial_sizes ? { ...cat.initial_sizes } : { 'Unico': 0 };
+        
+        const catDiv = document.createElement('div');
+        catDiv.className = 'category-block';
+        
+        if (cat.has_sizes) {
+          catDiv.innerHTML = `<h2 class="cat-title">${cat.name}</h2><div class="sizes-grid" id="grid-${index}"></div>`;
+          catWrap.appendChild(catDiv);
+          
+          const grid = catDiv.querySelector('.sizes-grid');
+          ['PP', 'P', 'M', 'G', 'GG', 'XG', 'XGG', 'G1', 'G2', 'G3', 'G4', 'G5'].forEach(size => {
+            const qty = selection[cat.name][size] || 0;
+            const item = document.createElement('div');
+            item.className = qty > 0 ? 'size-item active' : 'size-item';
+            item.id = `item-${index}-${size}`;
+            item.innerHTML = `
+              <span class="size-label">${size}</span>
+              <div class="counter">
+                <button onclick="attempt_change('${cat.name}', '${size}', -1, ${index})">−</button>
+                <span id="val-${index}-${size}">${qty}</span>
+                <button onclick="attempt_change('${cat.name}', '${size}', 1, ${index})">+</button>
+              </div>
+            `;
+            grid.appendChild(item);
+          });
         } else {
-          alert('Erro ao confirmar o pedido. Tente novamente.');
-          btn.textContent = 'CONFIRMAR E PAGAR';
-          btn.disabled = false;
+          const qty = selection[cat.name]['Unico'] || 0;
+          catDiv.innerHTML = `
+            <h2 class="cat-title">${cat.name}</h2>
+            <div class="size-item ${qty > 0 ? 'active' : ''}" id="item-${index}-Unico" style="width: 100%;">
+              <span class="size-label" style="font-size: 14px;">${cat.name} <br><small style="color:#facc15;">R$ ${(cat.price_cents/100).toFixed(2).replace('.', ',')} cada</small></span>
+              <div class="counter">
+                <button onclick="attempt_change('${cat.name}', 'Unico', -1, ${index})">−</button>
+                <span id="val-${index}-Unico">${qty}</span>
+                <button onclick="attempt_change('${cat.name}', 'Unico', 1, ${index})">+</button>
+              </div>
+            </div>
+          `;
+          catWrap.appendChild(catDiv);
         }
-      } catch (err) {
-        alert('Erro de conexão.');
-        btn.textContent = 'CONFIRMAR E PAGAR';
-        btn.disabled = false;
-      }
+      });
+
+      if (img_count > 1) enable_drag_scroll(document.getElementById('carousel'));
+      update_total();
     }
 
-    // TELA 2: PAGAMENTO (COM TIMER)
+    // TELA 2: PAGAMENTO (QR Code)
     function build_payment_ui(order) {
+      document.getElementById('status-banner').style.display = 'flex';
       const total = (order.total_cents / 100).toFixed(2).replace('.', ',');
       const expires_at = new Date(order.expires_at).getTime();
 
@@ -168,6 +228,86 @@
 
       document.getElementById('app-content').innerHTML = html;
       start_timer(expires_at);
+    }
+
+    // Funções de Cálculo e Interação
+    function update_total() {
+      let totalQty = 0;
+      let totalPriceCents = 0;
+      
+      orderData.available_categories.forEach(cat => {
+        const catPrice = cat.price_cents;
+        for (const size in selection[cat.name]) {
+          const qty = selection[cat.name][size];
+          totalQty += qty;
+          totalPriceCents += (catPrice * qty);
+        }
+      });
+
+      document.getElementById('total-qty').textContent = totalQty;
+      document.getElementById('total-price').textContent = `R$ ${(totalPriceCents / 100).toFixed(2).replace('.', ',')}`;
+      
+      const btn = document.getElementById('btn-confirm');
+      if (totalQty > 0) { btn.disabled = false; btn.style.opacity = '1'; } else { btn.disabled = true; btn.style.opacity = '0.5'; }
+    }
+
+    function enable_drag_scroll(slider) { let isDown = false; let startX; let scrollLeft; slider.addEventListener('mousedown', (e) => { isDown = true; slider.style.cursor = 'grabbing'; startX = e.pageX - slider.offsetLeft; scrollLeft = slider.scrollLeft; }); slider.addEventListener('mouseleave', () => { isDown = false; slider.style.cursor = 'grab'; }); slider.addEventListener('mouseup', () => { isDown = false; slider.style.cursor = 'grab'; }); slider.addEventListener('mousemove', (e) => { if (!isDown) return; e.preventDefault(); const x = e.pageX - slider.offsetLeft; const walk = (x - startX) * 2; slider.scrollLeft = scrollLeft - walk; }); }
+
+    function attempt_change(cat, size, delta, catIndex) {
+      if (delta < 0 && selection[cat][size] === 0) return; 
+      if (!modalShown) {
+        pendingChange = { cat, size, delta, catIndex };
+        document.getElementById('modal-alter').style.display = 'flex';
+      } else {
+        apply_change(cat, size, delta, catIndex);
+      }
+    }
+
+    function confirm_alter() {
+      if (pendingChange) apply_change(pendingChange.cat, pendingChange.size, pendingChange.delta, pendingChange.catIndex);
+      modalShown = true; close_alter_modal();
+    }
+
+    function close_alter_modal() {
+      document.getElementById('modal-alter').style.display = 'none';
+      pendingChange = null;
+    }
+
+    function apply_change(cat, size, delta, catIndex) {
+      selection[cat][size] += delta;
+      document.getElementById(`val-${catIndex}-${size}`).textContent = selection[cat][size];
+      const parent = document.getElementById(`item-${catIndex}-${size}`);
+      if (selection[cat][size] > 0) parent.classList.add('active'); else parent.classList.remove('active');
+      update_total();
+    }
+
+    async function confirm_order() {
+      const btn = document.getElementById('btn-confirm');
+      btn.textContent = 'GERANDO PAGAMENTO...';
+      btn.disabled = true;
+
+      const payload = {
+        selected_sizes: Object.keys(selection).map(cat => ({ category: cat, sizes: selection[cat] }))
+      };
+
+      try {
+        const res = await fetch(`/api/manual-orders/${id}/confirm`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          location.reload(); 
+        } else {
+          alert('Erro ao confirmar o pedido. Tente novamente.');
+          btn.textContent = 'CONFIRMAR E PAGAR';
+          btn.disabled = false;
+        }
+      } catch (err) {
+        alert('Erro de conexão.');
+        btn.textContent = 'CONFIRMAR E PAGAR';
+        btn.disabled = false;
+      }
     }
 
     function start_timer(expires_at) {
