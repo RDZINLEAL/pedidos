@@ -17,13 +17,16 @@ const OrderSchema = new mongoose.Schema({
   photos: [String], 
   
   payment_link: String,
+  manual_qr_path: String, // NOVO: Para salvar a imagem do QR Code manual
+  expires_at: Date,       // NOVO: Para o contador de 10 minutos
+  
   mp_payment_id: String,
   status: { type: String, default: 'draft' },
   
   product_name: { type: String, default: 'Camisa personalizada' },
   product_description: { type: String, default: 'Modelo esportivo' },
 
-  available_categories: Array, // Aqui vai entrar TUDO, inclusive o Boné
+  available_categories: Array,
   selected_sizes: Array,
   
   total_cents: Number,

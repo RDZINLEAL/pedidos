@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Pagamento via PIX - Bravus</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet">
+</head>
+<body class="dark-theme">
+  <div class="mobile-container">
+    
+    <div class="brand-header">
+      <img src="/assets/banner.png" class="top-banner-img">
+    </div>
+
+    <div id="app-content" style="padding: 0 15px;">
+      <div class="loading" style="text-align: center; margin-top: 50px; color: #aaa;">Carregando dados do pagamento...</div>
+    </div>
+
+  </div>
+
+  <script>
+    const id = window.location.hash ? window.location.hash.replace('#', '') : window.location.pathname.split('/').pop();
+    let timerInterval;
+
+    async function init() {
+      if (!id) return;
+      try {
+        const res = await fetch('/api/manual-orders/' + id);
+        if (!res.ok) throw new Error('Pedido não encontrado');
+        
+        const { order } = await res.json();
+        
+        if (order.status === 'paid') {
+          document.getElementById('app-content').innerHTML = `
+            <div class="card" style="text-align:center; padding: 40px 20px; margin-top: 20px;">
+              <h2 class="yellow-text">Pagamento Confirmado!</h2>
+              <p style="color:#aaa; margin-top:10px;">Seu pedido já está em produção.</p>
+            </div>`;
+          return;
+        }
+
+        render_payment(order);
+
+      } catch (err) {
+        document.getElementById('app-content').innerHTML = `<h1 style="color:white;text-align:center;margin-top:50px;">${err.message}</h1>`;
+      }
+    }
+
+    function render_payment(order) {
+      const total = (order.total_cents / 100).toFixed(2).replace('.', ',');
+      const expires_at = new Date(order.expires_at).getTime();
+
+      const html = `
+        <div class="card payment-card" style="margin-top: 10px;">
+          <div class="card-header-line">
+            <h2 style="font-size: 18px; margin:0; color:#fff;">Pagamento Manual</h2>
+            <span style="font-size: 12px; color: #888;">Pedido #${order.id}</span>
+          </div>
+
+          <div class="product-row" style="margin-bottom: 20px;">
+            <div class="product-info">
+              <h3 style="font-size: 15px; margin-bottom: 5px; color:#fff;">Cliente: ${order.client_name}</h3>
+              <div class="total-line" style="border:none; padding:0; margin-top:5px;">
+                <span style="color:#aaa; font-size:14px;">Total a pagar:</span>
+                <h2 class="yellow-text" style="font-size: 22px; margin:0;">R$ ${total}</h2>
+              </div>
+            </div>
+          </div>
+
+          <div class="pix-container">
+            <div class="pix-top" style="border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 15px;">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <img src="/assets/Nova pasta/01_selo_seguranca_transparent.png" style="width: 30px;">
+                <h3 style="font-size: 16px; margin:0; color:#fff;">Pague com PIX</h3>
+              </div>
+              <div id="timer-display" style="font-size: 14px; font-weight: bold; color: #facc15; background: #222; padding: 4px 10px; border-radius: 6px;">
+                10:00
+              </div>
+            </div>
+
+            <div class="pix-content" style="justify-content: center;">
+              <div class="qr-box" style="background: #fff; padding: 10px; border-radius: 8px;">
+                <img src="${order.manual_qr_path}" style="width: 200px; height: 200px; object-fit: contain;">
+              </div>
+            </div>
+
+            <div class="pix-instructions" style="margin-top: 20px;">
+              <p style="font-size: 13px; color: #ddd; text-align: center; margin-bottom: 10px;">
+                Escaneie o QR Code ou copie o código abaixo.
+              </p>
+              <div class="input-copy" style="height: 44px;">
+                <input type="text" id="pix-code" value="${order.payment_link}" readonly style="font-size: 13px;">
+                <button onclick="copy_pix()" style="background:#facc15; color:#000; font-weight:bold;">Copiar</button>
+              </div>
+            </div>
+
+            <button class="btn-copy-large" onclick="copy_pix()" style="background: #222; color: #fff; border: 1px solid #facc15; margin-top: 10px;">COPIAR CÓDIGO PIX</button>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('app-content').innerHTML = html;
+      start_timer(expires_at);
+    }
+
+    function start_timer(expires_at) {
+      const display = document.getElementById('timer-display');
+      
+      timerInterval = setInterval(() => {
+        const now = new Date().getTime();
+        const distance = expires_at - now;
+
+        if (distance < 0) {
+          clearInterval(timerInterval);
+          display.textContent = "EXPIRADO";
+          display.style.color = "#ef4444";
+          display.style.background = "rgba(239, 68, 68, 0.1)";
+          
+          // Opcional: Desabilitar botões de cópia se expirar
+          const btn = document.querySelector('.btn-copy-large');
+          if (btn) {
+             btn.disabled = true;
+             btn.textContent = "PIX EXPIRADO";
+             btn.style.opacity = 0.5;
+          }
+          return;
+        }
+
+        const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+        display.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        
+        if (distance < 60000) {
+          display.style.color = "#ef4444"; // Fica vermelho no último minuto
+        }
+      }, 1000);
+    }
+    
+    function copy_pix() {
+      const txt = document.getElementById('pix-code');
+      if(!txt.value) return;
+      txt.select();
+      document.execCommand('copy');
+      alert('Código PIX copiado com sucesso!');
+    }
+
+    init();
+  </script>
+</body>
+</html>

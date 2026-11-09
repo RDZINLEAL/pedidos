@@ -8,7 +8,7 @@ import { randomBytes, randomUUID } from 'crypto';
 import path from 'path';
 import fs from 'fs';
 import { create_order, get_orders, get_order, update_order, delete_all_orders } from './db.js';
-import { create_transaction } from './invictus.js';
+// Não importamos mais o módulo de pagamento aqui para esta rota
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -21,7 +21,7 @@ const upload = multer({
     destination: 'uploads/',
     filename: (_req, file, cb) => cb(null, `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`)
   }),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB por foto
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (!/^image\/(jpe?g|png|webp)$/.test(file.mimetype)) return cb(new Error('Apenas imagens (JPG, PNG, WEBP)'));
     cb(null, true);
@@ -42,33 +42,29 @@ function basic_auth(req, res, next) {
 }
 
 app.use('/admin.html', basic_auth);
+app.use('/manual.html', basic_auth); // Protege a nova página
 app.use('/limpar.html', basic_auth);
 app.use('/api/admin', basic_auth);
 app.use(express.static('public'));
 
-// AQUI ESTÁ A CORREÇÃO: upload.array aceita até 15 fotos
+// --- ROTAS ANTIGAS MANTIDAS ---
 app.post('/api/admin/orders', upload.array('photos', 15), async (req, res) => {
   try {
     const { client_name, client_email, client_document, client_phone, categories, product_name, product_description } = req.body;
-    
     const photos = req.files ? req.files.map(f => `/uploads/${f.filename}`) : [];
-
     const new_order = {
       id: randomBytes(3).toString('hex'),
       client_name, client_email, client_document, client_phone,
-      photos, // Salva o array de fotos
+      photos,
       product_name: product_name || 'Camisa personalizada',
       product_description: product_description || 'Modelo esportivo',
       available_categories: JSON.parse(categories),
       status: 'draft',
       total_cents: 0
     };
-
     await create_order(new_order);
     res.json({ order: await get_order(new_order.id) });
-  } catch (error) { 
-    res.status(500).json({ error: error.message }); 
-  }
+  } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 app.post('/api/orders/:id/checkout', async (req, res) => {
@@ -78,7 +74,6 @@ app.post('/api/orders/:id/checkout', async (req, res) => {
     if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
 
     let total_cents = 0;
-    
     selected_sizes.forEach(sel => {
       const category_info = order.available_categories.find(c => c.name === sel.category);
       if (category_info) {
@@ -90,19 +85,63 @@ app.post('/api/orders/:id/checkout', async (req, res) => {
 
     if (total_cents === 0) return res.status(400).json({ error: 'Selecione pelo menos um item.' });
 
-    const tx = await create_transaction({ ...order, total_cents, items: [{ description: order.product_name || 'Pedido Bravus', quantity: 1, unit_price_cents: total_cents }] }, base);
-    
-    await update_order(order.id, {
-      selected_sizes,
-      total_cents,
-      status: 'pending',
-      payment_link: tx.payment_link,
-      mp_preference_id: tx.transaction_id
-    });
+    // AQUI VOCÊ PODE COLOCAR A API DE VOLTA QUANDO QUISER
+    // const tx = await create_transaction({ ...order, total_cents }, base);
+    // await update_order(order.id, { selected_sizes, total_cents, status: 'pending', payment_link: tx.payment_link, mp_preference_id: tx.transaction_id });
 
-    res.json({ success: true, payment_link: tx.payment_link });
+    res.json({ success: true, message: "Aguardando integração de pagamento." });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+// --- NOVAS ROTAS MANUAIS ---
+
+// Cria o pedido manual
+app.post('/api/admin/manual-orders', upload.single('qr_image'), async (req, res) => {
+  try {
+    const { client_name, client_email, amount_reais, pix_code } = req.body;
+    
+    if (!client_name || !amount_reais || !pix_code || !req.file) {
+      return res.status(400).json({ error: 'Preencha todos os campos e envie o QR Code.' });
+    }
+
+    const total_cents = Math.round(parseFloat(amount_reais) * 100);
+    const qr_image_path = `/uploads/${req.file.filename}`;
+    
+    // Define a expiração para 10 minutos a partir de agora
+    const expires_at = new Date(Date.now() + 10 * 60 * 1000);
+
+    const new_order = {
+      id: randomBytes(3).toString('hex'),
+      client_name,
+      client_email: client_email || 'nao-informado@email.com',
+      client_document: '00000000000',
+      client_phone: '00000000000',
+      total_cents,
+      payment_link: pix_code,
+      manual_qr_path: qr_image_path,
+      expires_at,
+      product_name: 'Pagamento Manual',
+      product_description: 'Via PIX',
+      status: 'pending', // Já vai para pendente
+      available_categories: [],
+      selected_sizes: []
+    };
+
+    await create_order(new_order);
+    res.json({ order: await get_order(new_order.id) });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Busca os dados para a tela do cliente manual
+app.get('/api/manual-orders/:id', async (req, res) => {
+  const order = await get_order(req.params.id);
+  if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
+  res.json({ order });
+});
+
+// --- FIM DAS ROTAS MANUAIS ---
 
 app.get('/api/admin/orders', async (_req, res) => res.json({ orders: await get_orders() }));
 app.delete('/api/admin/orders', async (req, res) => { await delete_all_orders(); res.json({ success: true }); });
@@ -112,21 +151,8 @@ app.get('/api/orders/:id', async (req, res) => {
   res.json({ order });
 });
 
-app.post('/api/webhook/invictus', async (req, res) => {
-  try {
-    const { event, transaction } = req.body;
-    const order_id = req.query.order_id;
-
-    if (order_id && transaction && event) {
-      if (event.includes('CHARGE_PAID')) {
-        await update_order(order_id, { status: 'paid', mp_payment_id: transaction.id, paid_at: new Date().toISOString() });
-      } else if (event.includes('CHARGE_EXPIRED') || event.includes('CHARGE_REFUND')) {
-        await update_order(order_id, { status: 'rejected' });
-      }
-    }
-    res.sendStatus(200);
-  } catch (err) { res.sendStatus(500); }
-});
-
+// Rotas de páginas
 app.get('/pagamentoseguro', (_req, res) => res.sendFile(path.resolve('public/order.html')));
+app.get('/pagamentomanual', (_req, res) => res.sendFile(path.resolve('public/manual_pay.html'))); // NOVA PÁGINA CLIENTE
+
 app.listen(port, () => console.log(`Rodando em ${base}`));
