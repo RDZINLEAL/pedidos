@@ -41,6 +41,19 @@
       </div>
     </div>
 
+    <div class="modal-overlay" id="modal-review">
+      <div class="modal-box review-box">
+        <h3>Confirme seu pedido</h3>
+        <p>Revise os itens abaixo. Depois de confirmar, geramos o Pix para pagamento.</p>
+        <div id="review-lines" class="review-lines"></div>
+        <div class="review-total"><span>Total</span><strong class="yellow-text" id="review-total">R$ 0,00</strong></div>
+        <div class="modal-btns">
+          <button class="btn-cancel" onclick="close_review()">Voltar</button>
+          <button class="btn-ok" onclick="confirm_review()">Confirmar e gerar Pix</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <script>
@@ -90,35 +103,47 @@
         });
       }
 
+      const first_name = (order.client_name || '').trim().split(' ')[0];
+
       let html = `
+        <ol class="steps">
+          <li class="active"><b>1</b>Confirmação</li>
+          <li><b>2</b>Pagamento</li>
+          <li><b>3</b>Produção</li>
+        </ol>
+
+        <div class="confirm-head">
+          <span class="confirm-tag">Pedido #${esc(order.id)}</span>
+          <h1 class="title-main">Confirmação do <span class="yellow-text">Pedido</span></h1>
+          <p class="subtitle">${first_name ? `Olá, ${esc(first_name)}! ` : ''}Confira os itens e as quantidades por tamanho. Se precisar, ajuste antes de confirmar.</p>
+        </div>
+
         <div class="carousel-container" style="display:${img_count > 0 ? 'block' : 'none'}">
           <div class="carousel-track" id="carousel">${carousel_html}</div>
           <div id="carousel-hint" style="display:${img_count > 1 ? 'block' : 'none'}; text-align:center; font-size:11px; color:#facc15; padding:5px; background:rgba(0,0,0,0.5);">← Deslize para o lado →</div>
         </div>
 
-        <h1 class="title-main">Confira seu <span class="yellow-text">Pedido</span></h1>
-        <p class="subtitle">Ajuste os tamanhos se necessário.</p>
-
-        <div id="categories-wrapper"></div>
-
-        <div class="summary-box">
-          <div class="summary-left">
-            <div class="icon-box"><img src="/assets/Nova pasta/01_selo_seguranca_transparent.png"></div>
-            <div>
-              <strong>${order.product_name}</strong>
-              <span>${order.product_description}</span>
-            </div>
-          </div>
-          <div class="summary-right">
-            <span>Quantidade total</span>
-            <strong class="yellow-text" id="total-qty">0</strong>
-            <span style="margin-top:5px;">Valor Total</span>
-            <strong class="yellow-text" id="total-price" style="font-size:18px;">R$ 0,00</strong>
+        <div class="product-head">
+          <div class="icon-box"><img src="/assets/Nova pasta/01_selo_seguranca_transparent.png"></div>
+          <div>
+            <strong>${order.product_name}</strong>
+            <span>${order.product_description}</span>
           </div>
         </div>
 
-        <button class="btn-confirm" id="btn-confirm" onclick="open_confirm_modal()" disabled>CONFIRMAR E PAGAR</button>
-        <p class="secure-text">🔒 Você poderá revisar antes do pagamento.</p>
+        <div id="categories-wrapper"></div>
+
+        <div class="order-summary">
+          <h2>Resumo do pedido</h2>
+          <div id="summary-lines"></div>
+          <div class="order-summary-total">
+            <div><span>Total de peças</span><strong id="total-qty">0</strong></div>
+            <div class="right"><span>Valor total</span><strong class="yellow-text" id="total-price">R$ 0,00</strong></div>
+          </div>
+        </div>
+
+        <button class="btn-confirm" id="btn-confirm" onclick="open_review()" disabled>CONFIRMAR PEDIDO</button>
+        <p class="secure-text">🔒 Você revisa o pedido mais uma vez antes de gerar o Pix.</p>
       `;
 
       document.getElementById('app-content').innerHTML = html;
@@ -132,7 +157,7 @@
         catDiv.className = 'category-block';
         
         if (cat.has_sizes) {
-          catDiv.innerHTML = `<h2 class="cat-title">${cat.name}</h2><div class="sizes-grid" id="grid-${index}"></div>`;
+          catDiv.innerHTML = `<h2 class="cat-title">${cat.name} <small>${brl(cat.price_cents)} cada</small></h2><div class="sizes-grid" id="grid-${index}"></div>`;
           catWrap.appendChild(catDiv);
           
           const grid = catDiv.querySelector('.sizes-grid');
@@ -172,22 +197,38 @@
       update_total();
     }
 
-    function update_total() {
-      let totalQty = 0;
-      let totalPriceCents = 0;
-      
-      orderData.available_categories.forEach(cat => {
-        const catPrice = cat.price_cents;
-        for (const size in selection[cat.name]) {
-          const qty = selection[cat.name][size];
-          totalQty += qty;
-          totalPriceCents += (catPrice * qty);
-        }
-      });
+    function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+    function brl(cents) { return 'R$ ' + (cents / 100).toFixed(2).replace('.', ','); }
 
+    /* Linhas do resumo: uma por categoria com peças escolhidas */
+    function summary_rows() {
+      return orderData.available_categories.map(cat => {
+        const sizes = selection[cat.name] || {};
+        const qty = Object.values(sizes).reduce((a, q) => a + q, 0);
+        const detail = Object.entries(sizes).filter(([_, q]) => q > 0)
+          .map(([sz, q]) => sz === 'Unico' ? `${q} un` : `${sz}: ${q}`).join(' · ');
+        return { name: cat.name, qty, detail, cents: cat.price_cents * qty };
+      }).filter(r => r.qty > 0);
+    }
+
+    function rows_html(rows) {
+      if (!rows.length) return '<p class="summary-empty">Nenhuma peça selecionada.</p>';
+      return rows.map(r => `
+        <div class="summary-line">
+          <div><strong>${esc(r.name)}</strong><span>${r.qty} ${r.qty === 1 ? 'peça' : 'peças'} — ${esc(r.detail)}</span></div>
+          <b>${brl(r.cents)}</b>
+        </div>`).join('');
+    }
+
+    function update_total() {
+      const rows = summary_rows();
+      const totalQty = rows.reduce((a, r) => a + r.qty, 0);
+      const totalPriceCents = rows.reduce((a, r) => a + r.cents, 0);
+
+      document.getElementById('summary-lines').innerHTML = rows_html(rows);
       document.getElementById('total-qty').textContent = totalQty;
-      document.getElementById('total-price').textContent = `R$ ${(totalPriceCents / 100).toFixed(2).replace('.', ',')}`;
-      
+      document.getElementById('total-price').textContent = brl(totalPriceCents);
+
       const btn = document.getElementById('btn-confirm');
       if (totalQty > 0) { btn.disabled = false; btn.style.opacity = '1'; } else { btn.disabled = true; btn.style.opacity = '0.5'; }
     }
@@ -320,6 +361,20 @@
       update_total();
     }
 
+    /* Revisão final antes de gerar o Pix */
+    function open_review() {
+      const rows = summary_rows();
+      if (!rows.length) return;
+      const total = rows.reduce((a, r) => a + r.cents, 0);
+      document.getElementById('review-lines').innerHTML = rows_html(rows);
+      document.getElementById('review-total').textContent = brl(total);
+      document.getElementById('modal-review').style.display = 'flex';
+    }
+
+    function close_review() { document.getElementById('modal-review').style.display = 'none'; }
+
+    function confirm_review() { close_review(); open_confirm_modal(); }
+
     async function open_confirm_modal() {
       const btn = document.getElementById('btn-confirm');
       btn.textContent = 'GERANDO PIX...';
@@ -340,12 +395,12 @@
           location.reload(); 
         } else {
           const errJson = await res.json().catch(() => ({}));
-          btn.textContent = 'CONFIRMAR E PAGAR';
+          btn.textContent = 'CONFIRMAR PEDIDO';
           btn.disabled = false;
           alert('Erro: ' + (errJson.error || 'Verifique o painel.'));
         }
-      } catch (err) { 
-        btn.textContent = 'CONFIRMAR E PAGAR';
+      } catch (err) {
+        btn.textContent = 'CONFIRMAR PEDIDO';
         btn.disabled = false;
         alert('Erro de conexão.'); 
       }
