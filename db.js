@@ -17,8 +17,8 @@ const OrderSchema = new mongoose.Schema({
   photos: [String], 
   
   payment_link: String,
-  manual_qr_path: String, // NOVO: Para salvar a imagem do QR Code manual
-  expires_at: Date,       // NOVO: Para o contador de 10 minutos
+  qr_image: String,       // Salva a imagem base64 (PinguPag) ou caminho da imagem (Manual)
+  expires_at: Date,       // Usado pelo manual e pela PinguPag
   
   mp_payment_id: String,
   status: { type: String, default: 'draft' },

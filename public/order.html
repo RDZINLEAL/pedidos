@@ -196,8 +196,11 @@
       document.getElementById('status-banner').style.display = 'flex'; 
       const total = (order.total_cents / 100).toFixed(2).replace('.', ',');
       
-      // GERA O QR CODE USANDO A API PADRAO
-      const qr_src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(order.payment_link)}`;
+      // Se a PinguPag mandou a imagem base64, usa ela. Senão, gera pelo link.
+      let qr_src = order.qr_image;
+      if (!qr_src) {
+         qr_src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(order.payment_link)}`;
+      }
 
       let items_html = '';
       if(order.selected_sizes) {
