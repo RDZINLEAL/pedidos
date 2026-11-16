@@ -3,277 +3,625 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Painel Bravus - Administração</title>
+  <title>Painel Bravus</title>
   <link rel="icon" type="image/png" href="/favicon.png">
-  <link rel="stylesheet" href="/style.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
 </head>
 <body class="admin-body">
   <header class="admin-header">
     <div class="header-content">
       <h1>Painel <span class="yellow-text">Bravus</span></h1>
-      <span class="badge">Admin</span>
+      <nav class="tabs" role="tablist">
+        <button class="tab active" data-tab="pedidos" role="tab">Pedidos</button>
+        <button class="tab" data-tab="novo" role="tab">+ Novo pedido</button>
+      </nav>
     </div>
   </header>
 
-  <main class="admin-main dashboard-grid">
+  <!-- ================= ABA: PEDIDOS ================= -->
+  <main class="admin-main" id="tab-pedidos">
+    <section class="stats">
+      <div class="stat"><span>Vendido</span><strong class="yellow-text" id="st-sold">R$ 0,00</strong><small id="st-sold-n">0 pagos</small></div>
+      <div class="stat"><span>Aguardando pagamento</span><strong id="st-pending">R$ 0,00</strong><small id="st-pending-n">0 pedidos</small></div>
+      <div class="stat"><span>Rascunhos</span><strong id="st-draft">0</strong><small>cliente ainda não confirmou</small></div>
+      <div class="stat"><span>Ticket médio</span><strong id="st-avg">R$ 0,00</strong><small>dos pagos</small></div>
+    </section>
+
+    <section class="toolbar">
+      <input type="search" id="f-search" placeholder="Buscar por nome, telefone, e-mail, CPF ou código">
+      <select id="f-status">
+        <option value="">Todas as situações</option>
+        <option value="draft">Rascunho</option>
+        <option value="pending">Aguardando</option>
+        <option value="paid">Pago</option>
+        <option value="rejected">Recusado</option>
+      </select>
+      <select id="f-period">
+        <option value="">Todo o período</option>
+        <option value="today">Hoje</option>
+        <option value="7">Últimos 7 dias</option>
+        <option value="30">Últimos 30 dias</option>
+        <option value="month">Este mês</option>
+      </select>
+      <button class="btn-secondary" onclick="export_csv()">Exportar CSV</button>
+      <button class="btn-secondary" onclick="load_orders(true)" title="Atualizar">↻</button>
+    </section>
+
+    <p class="list-info" id="list-info"></p>
+    <section id="orders-list" class="orders-list"><p class="empty">Carregando pedidos...</p></section>
+
+    <section class="danger-zone">
+      <div>
+        <strong>Apagar todos os pedidos</strong>
+        <p>Remove todos os pedidos do banco de dados. Não dá para desfazer.</p>
+      </div>
+      <button class="btn-danger" onclick="open_delete_all()">Apagar todos</button>
+    </section>
+  </main>
+
+  <!-- ================= ABA: NOVO PEDIDO ================= -->
+  <main class="admin-main dashboard-grid" id="tab-novo" hidden>
     <div class="main-column">
-      <section class="card">
-        <div class="card-header">
-          <h2>Novo Pedido</h2>
+      <section class="card" id="new-card">
+        <div class="kind-switch" role="radiogroup">
+          <label><input type="radio" name="kind" value="auto" checked><span><b>Pix automático</b><small>PinguPag gera o Pix e confirma sozinho</small></span></label>
+          <label><input type="radio" name="kind" value="manual"><span><b>Pix manual</b><small>Você sobe o QR do seu banco e marca como pago</small></span></label>
         </div>
-        
-        <form id="order-form" enctype="multipart/form-data">
+
+        <form id="order-form" enctype="multipart/form-data" novalidate>
+          <h3 class="form-section">Cliente</h3>
           <div class="form-grid">
-            <label class="input-group">Nome do Cliente
+            <label class="input-group">Nome do cliente *
               <input name="client_name" placeholder="Ex: João Silva" required>
             </label>
-            <label class="input-group">E-mail
-              <input name="client_email" type="email" placeholder="joao@email.com" required>
+            <label class="input-group"><span>Telefone / WhatsApp<span class="only-auto"> *</span></span>
+              <input name="client_phone" inputmode="tel" placeholder="DDD + número" data-auto-required>
             </label>
-            <label class="input-group">CPF/CNPJ
-              <input name="client_document" placeholder="Apenas números" required>
+            <label class="input-group"><span>E-mail<span class="only-auto"> *</span></span>
+              <input name="client_email" type="email" placeholder="joao@email.com" data-auto-required>
             </label>
-            <label class="input-group">Telefone / WhatsApp
-              <input name="client_phone" placeholder="DDD + Número" required>
+            <label class="input-group only-auto">CPF/CNPJ *
+              <input name="client_document" inputmode="numeric" placeholder="Apenas números" data-auto-required>
             </label>
           </div>
 
+          <h3 class="form-section">Produto</h3>
           <div class="form-grid">
-            <label class="input-group">Nome do Produto Principal
-              <input name="product_name" value="Camisa personalizada" required>
+            <label class="input-group">Nome do produto
+              <input name="product_name" value="Camisa personalizada">
             </label>
             <label class="input-group">Descrição
-              <input name="product_description" value="Modelo esportivo" required>
+              <input name="product_description" value="Modelo esportivo">
             </label>
           </div>
 
-          <div class="file-input" style="background: #1a1a1a; padding: 20px; border-radius: 8px; border: 1px dashed #444; margin-bottom: 25px;">
-            <label style="font-size: 14px; color: #fff; font-weight: bold; display: block; margin-bottom: 10px;">
-              Fotos do Pedido
-            </label>
-            <p style="font-size: 12px; color: #888; margin-bottom: 15px;">
-              Segure a tecla <strong>CTRL</strong> para selecionar várias fotos de uma vez.
-            </p>
-            <input name="photos" type="file" accept="image/*" multiple required style="width: 100%; padding: 10px; background: #050505; border: 1px solid #333; border-radius: 6px; color: #fff;">
-          </div>
-
-          <hr class="divider">
+          <label class="drop-zone">
+            <input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple id="photos-input">
+            <span><b>Fotos do pedido</b> — clique ou arraste aqui (até 15)</span>
+            <div class="thumbs" id="photos-preview"></div>
+          </label>
 
           <div class="section-title">
-            <h3>Categorias (Camisas, Bonés, etc)</h3>
-            <button type="button" onclick="add_category()" class="btn-secondary">+ Adicionar Categoria</button>
+            <h3 class="form-section">Categorias e quantidades iniciais</h3>
+            <button type="button" onclick="add_category('categories-container')" class="btn-secondary">+ Categoria</button>
           </div>
-          
           <div id="categories-container" class="categories-list"></div>
+          <p class="hint">Total pelas quantidades iniciais: <b class="yellow-text" id="initial-total">R$ 0,00</b></p>
 
-          <button type="submit" class="btn-primary" style="margin-top: 20px;">Gerar Link de Personalização</button>
+          <div class="only-manual manual-box">
+            <h3 class="form-section">Dados do Pix manual</h3>
+            <div class="form-grid">
+              <label class="input-group">Valor total (R$) *
+                <input name="amount_reais" inputmode="decimal" placeholder="Ex: 199,90" data-manual-required>
+                <button type="button" class="link-btn" onclick="use_initial_total()">Usar o total das categorias</button>
+              </label>
+              <label class="input-group">Foto do QR Code (print do banco) *
+                <input type="file" name="qr_image" accept="image/jpeg,image/png,image/webp" data-manual-required>
+              </label>
+            </div>
+            <label class="input-group">Pix copia e cola *
+              <textarea name="pix_code" rows="3" placeholder="Cole aqui o código Pix do seu banco" data-manual-required></textarea>
+            </label>
+          </div>
+
+          <p class="form-error" id="form-error"></p>
+          <button type="submit" class="btn-primary" id="btn-create">Gerar link do cliente</button>
         </form>
-        <p id="result" class="result-msg"></p>
-      </section>
 
-      <section class="card">
-        <div class="card-header table-header">
-          <h2>Pedidos Recentes</h2>
-          <button type="button" onclick="clear_orders()" class="btn-danger">Apagar Todos</button>
-        </div>
-        
-        <div class="table-responsive">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Código</th>
-                <th>Cliente</th>
-                <th>Status</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody id="orders-body"></tbody>
-          </table>
+        <div id="created" class="created" hidden>
+          <h2>✅ Pedido criado</h2>
+          <p>Envie este link para o cliente:</p>
+          <div class="input-copy big"><input id="created-link" readonly><button onclick="copy_text(document.getElementById('created-link').value)">Copiar</button></div>
+          <div class="created-actions">
+            <a class="btn-secondary" id="created-open" target="_blank">Abrir</a>
+            <a class="btn-whats" id="created-wa" target="_blank">Enviar no WhatsApp</a>
+            <button class="btn-secondary" onclick="reset_form()">Criar outro pedido</button>
+          </div>
         </div>
       </section>
     </div>
 
-    <div class="sidebar-column">
+    <aside class="sidebar-column">
       <div class="card calc-card">
-        <div class="card-header">
-          <h2>Calculadora Rápida</h2>
-        </div>
+        <div class="card-header"><h2>Calculadora rápida</h2></div>
         <div class="calc-section">
           <h4>Camisas</h4>
           <div class="calc-row">
             <label>Qtd<input type="number" id="calc_shirt_qty" value="0" min="0" oninput="calc_total()"></label>
-            <label>Valor Un. (R$)<input type="number" id="calc_shirt_price" value="0.00" step="0.01" oninput="calc_total()"></label>
+            <label>Valor un. (R$)<input type="number" id="calc_shirt_price" value="0" step="0.01" oninput="calc_total()"></label>
           </div>
         </div>
         <div class="calc-section" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #27272a;">
-          <h4>Outros (Bonés)</h4>
+          <h4>Outros (bonés)</h4>
           <div class="calc-row">
             <label>Qtd<input type="number" id="calc_hat_qty" value="0" min="0" oninput="calc_total()"></label>
-            <label>Valor Un. (R$)<input type="number" id="calc_hat_price" value="0.00" step="0.01" oninput="calc_total()"></label>
+            <label>Valor un. (R$)<input type="number" id="calc_hat_price" value="0" step="0.01" oninput="calc_total()"></label>
           </div>
         </div>
-        <div class="calc-total">
-          <span>Total Geral</span>
-          <h3 class="yellow-text" id="res_total">R$ 0,00</h3>
-        </div>
-        <div class="calc-split">
-          <span>Dividir em 2x</span>
-          <h4 id="res_split">R$ 0,00</h4>
-        </div>
+        <div class="calc-total"><span>Total geral</span><h3 class="yellow-text" id="res_total">R$ 0,00</h3></div>
+        <div class="calc-split"><span>Dividir em 2x</span><h4 id="res_split">R$ 0,00</h4></div>
       </div>
-    </div>
+    </aside>
   </main>
 
-  <script>
-    // TAMANHOS ATUALIZADOS
-    const sizes = ['PP', 'P', 'M', 'G', 'GG', 'XG', 'XGG', 'G1', 'G2', 'G3', 'G4', 'G5'];
+  <!-- ================= MODAIS ================= -->
+  <div class="modal-overlay" id="modal-edit">
+    <div class="modal-box modal-wide">
+      <h3>Editar pedido <span class="muted" id="edit-code"></span></h3>
+      <form id="edit-form" novalidate>
+        <div class="form-grid">
+          <label class="input-group">Nome do cliente<input name="client_name"></label>
+          <label class="input-group">Telefone / WhatsApp<input name="client_phone"></label>
+          <label class="input-group">E-mail<input name="client_email" type="email"></label>
+          <label class="input-group">CPF/CNPJ<input name="client_document"></label>
+          <label class="input-group">Produto<input name="product_name"></label>
+          <label class="input-group">Descrição<input name="product_description"></label>
+          <label class="input-group">Situação
+            <select name="status">
+              <option value="draft">Rascunho (cliente ainda não confirmou)</option>
+              <option value="pending">Aguardando pagamento</option>
+              <option value="paid">Pago</option>
+              <option value="rejected">Recusado</option>
+            </select>
+          </label>
+          <label class="input-group edit-manual">Valor total (R$)<input name="amount_reais" inputmode="decimal"></label>
+        </div>
+        <label class="input-group edit-manual">Pix copia e cola<textarea name="payment_link" rows="2"></textarea></label>
+        <div class="section-title">
+          <h3 class="form-section">Categorias</h3>
+          <button type="button" onclick="add_category('edit-categories')" class="btn-secondary">+ Categoria</button>
+        </div>
+        <p class="hint" id="edit-note"></p>
+        <div id="edit-categories" class="categories-list"></div>
+        <p class="form-error" id="edit-error"></p>
+        <div class="modal-btns">
+          <button type="button" class="btn-cancel" onclick="close_modal('modal-edit')">Cancelar</button>
+          <button type="submit" class="btn-ok">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
-    function add_category() {
+  <div class="modal-overlay" id="modal-confirm">
+    <div class="modal-box">
+      <h3 id="confirm-title"></h3>
+      <p id="confirm-text"></p>
+      <input id="confirm-input" class="confirm-input" hidden autocomplete="off">
+      <div class="modal-btns">
+        <button class="btn-cancel" onclick="close_modal('modal-confirm')">Cancelar</button>
+        <button class="btn-ok" id="confirm-ok">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const SIZES = ['PP', 'P', 'M', 'G', 'GG', 'XG', 'XGG', 'G1', 'G2', 'G3', 'G4', 'G5'];
+    const STATUS = {
+      draft: { label: 'Rascunho', cls: 'status-draft' },
+      pending: { label: 'Aguardando', cls: 'status-pending' },
+      paid: { label: 'Pago', cls: 'status-paid' },
+      rejected: { label: 'Recusado', cls: 'status-rejected' }
+    };
+    let orders = [];
+    let editing = null;
+
+    /* ---------- Utilidades ---------- */
+    const $ = (s) => document.querySelector(s);
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const brl = (c) => 'R$ ' + ((c || 0) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmt_date = (d) => d ? new Date(d).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
+    const link_for = (o) => `${location.origin}/pagamentoseguro#${o.id}`;
+    const short = (id) => String(id).slice(0, 6).toUpperCase();
+    const to_cents = (v) => Math.round(parseFloat(String(v || '').replace(/\./g, '').replace(',', '.')) * 100);
+    const cents_to_input = (c) => ((c || 0) / 100).toFixed(2).replace('.', ',');
+
+    function wa_link(phone, text) {
+      let d = String(phone || '').replace(/\D/g, '');
+      if (!d) return null;
+      if (d.length <= 11) d = '55' + d;
+      return `https://wa.me/${d}?text=${encodeURIComponent(text)}`;
+    }
+    function wa_message(o) {
+      const first = String(o.client_name || '').trim().split(/\s+/)[0];
+      return `Olá${first ? ', ' + first : ''}! Segue o link para confirmar seu pedido Bravus: ${link_for(o)}`;
+    }
+
+    function toast(msg, error = false) {
+      const t = $('#toast');
+      t.textContent = msg; t.className = 'toast show' + (error ? ' error' : '');
+      clearTimeout(t._h); t._h = setTimeout(() => t.className = 'toast', 2600);
+    }
+    async function copy_text(text) {
+      try { await navigator.clipboard.writeText(text); }
+      catch { const i = document.createElement('textarea'); i.value = text; document.body.appendChild(i); i.select(); document.execCommand('copy'); i.remove(); }
+      toast('Copiado!');
+    }
+    async function api(url, opts = {}) {
+      const res = await fetch(location.origin + url, opts);
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || `Erro ${res.status}`);
+      return json;
+    }
+    function open_modal(id) { document.getElementById(id).style.display = 'flex'; }
+    function close_modal(id) { document.getElementById(id).style.display = 'none'; }
+    document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('mousedown', e => { if (e.target === m) m.style.display = 'none'; }));
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.modal-overlay').forEach(m => m.style.display = 'none'); });
+
+    function ask(title, text, { danger = false, typed = null, ok = 'Confirmar' } = {}) {
+      return new Promise(resolve => {
+        $('#confirm-title').textContent = title;
+        $('#confirm-text').innerHTML = text;
+        const input = $('#confirm-input');
+        input.hidden = !typed; input.value = ''; input.placeholder = typed || '';
+        const btn = $('#confirm-ok');
+        btn.textContent = ok; btn.className = danger ? 'btn-danger' : 'btn-ok';
+        btn.onclick = () => {
+          if (typed && input.value.trim().toUpperCase() !== typed) { input.focus(); toast(`Digite ${typed} para confirmar`, true); return; }
+          close_modal('modal-confirm'); resolve(true);
+        };
+        open_modal('modal-confirm');
+        if (typed) setTimeout(() => input.focus(), 50);
+      });
+    }
+
+    /* ---------- Abas ---------- */
+    function show_tab(name) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+      $('#tab-pedidos').hidden = name !== 'pedidos';
+      $('#tab-novo').hidden = name !== 'novo';
+      history.replaceState(null, '', name === 'novo' ? '#novo' : '#');
+      if (name === 'pedidos') load_orders();
+    }
+    document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => show_tab(t.dataset.tab)));
+
+    /* ---------- Categorias (usado no novo pedido e na edição) ---------- */
+    function add_category(container_id, cat = null) {
       const div = document.createElement('div');
       div.className = 'category-setup';
-      
+      const has_sizes = cat ? !!cat.has_sizes : true;
+      const init = (cat && cat.initial_sizes) || {};
       div.innerHTML = `
-        <div class="cat-top" style="flex-direction: column; gap: 10px; align-items: stretch;">
-          <div style="display: flex; gap: 10px;">
-            <input type="text" class="cat-name" placeholder="Ex: Camisa Polo ou Boné" required style="flex: 2;">
-            <input type="number" class="cat-price" placeholder="Preço Un. (R$)" step="0.01" required style="flex: 1;">
-            <button type="button" class="btn-remove" onclick="this.closest('.category-setup').remove()">×</button>
-          </div>
-          <label class="switch-label" style="font-size: 13px;">
-            <input type="checkbox" class="cat-has-sizes" checked onchange="toggle_sizes(this)">
-            Esta categoria tem tamanhos?
-          </label>
+        <div class="cat-top">
+          <input type="text" class="cat-name" placeholder="Ex: Camisa Polo ou Boné" value="${esc(cat?.name || '')}">
+          <input type="text" inputmode="decimal" class="cat-price" placeholder="Preço un. (R$)" value="${cat ? cents_to_input(cat.price_cents) : ''}">
+          <button type="button" class="btn-remove" title="Remover categoria">×</button>
         </div>
-        
-        <div class="cat-sizes" style="margin-top: 15px;">
-          ${sizes.map(sz => `
-            <div class="size-input">
-              <label>${sz}</label>
-              <input type="number" class="init-size" data-size="${sz}" value="0" min="0">
-            </div>
-          `).join('')}
+        <label class="switch-label"><input type="checkbox" class="cat-has-sizes" ${has_sizes ? 'checked' : ''}> Tem tamanhos</label>
+        <div class="cat-sizes" ${has_sizes ? '' : 'hidden'}>
+          ${SIZES.map(sz => `<div class="size-input"><label>${sz}</label><input type="number" class="init-size" data-size="${sz}" value="${init[sz] || 0}" min="0"></div>`).join('')}
         </div>
-        
-        <div class="cat-single-qty" style="display: none; margin-top: 15px;">
-          <label class="input-group" style="margin-bottom:0;">Quantidade Inicial
-            <input type="number" class="init-qty-single" value="0" min="0">
-          </label>
-        </div>
-      `;
-      document.getElementById('categories-container').appendChild(div);
-    }
-    
-    function toggle_sizes(checkbox) {
-      const block = checkbox.closest('.category-setup');
-      const sizesDiv = block.querySelector('.cat-sizes');
-      const singleDiv = block.querySelector('.cat-single-qty');
-      
-      if (checkbox.checked) {
-        sizesDiv.style.display = 'grid';
-        singleDiv.style.display = 'none';
-      } else {
-        sizesDiv.style.display = 'none';
-        singleDiv.style.display = 'block';
-      }
+        <div class="cat-single-qty" ${has_sizes ? 'hidden' : ''}>
+          <label class="input-group">Quantidade inicial<input type="number" class="init-qty-single" value="${init.Unico || 0}" min="0"></label>
+        </div>`;
+      div.querySelector('.btn-remove').onclick = () => { div.remove(); update_initial_total(); };
+      div.querySelector('.cat-has-sizes').onchange = (e) => {
+        div.querySelector('.cat-sizes').hidden = !e.target.checked;
+        div.querySelector('.cat-single-qty').hidden = e.target.checked;
+        update_initial_total();
+      };
+      div.addEventListener('input', update_initial_total);
+      document.getElementById(container_id).appendChild(div);
     }
 
-    add_category(); 
-
-    function calc_total() {
-      const sq = parseFloat(document.getElementById('calc_shirt_qty').value) || 0;
-      const sp = parseFloat(document.getElementById('calc_shirt_price').value) || 0;
-      const hq = parseFloat(document.getElementById('calc_hat_qty').value) || 0;
-      const hp = parseFloat(document.getElementById('calc_hat_price').value) || 0;
-      const total = (sq * sp) + (hq * hp);
-      document.getElementById('res_total').textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
-      document.getElementById('res_split').textContent = `R$ ${(total / 2).toFixed(2).replace('.', ',')}`;
-    }
-
-    async function load_orders() {
-      const res = await fetch('/api/admin/orders');
-      const { orders } = await res.json();
-      const tbody = document.getElementById('orders-body');
-      tbody.innerHTML = '';
-      
-      if (orders.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#666;">Nenhum pedido cadastrado ainda.</td></tr>';
-        return;
-      }
-
-      orders.forEach(o => {
-        const link = `${window.location.origin}/pagamentoseguro#${o.id}`;
-        const statusClass = o.status === 'paid' ? 'status-paid' : (o.status === 'draft' ? 'status-draft' : 'status-pending');
-        tbody.innerHTML += `
-          <tr>
-            <td><strong>${o.id}</strong></td>
-            <td>${o.client_name}<br><small style="color:#666;">${o.client_phone || ''}</small></td>
-            <td><span class="badge-status ${statusClass}">${o.status}</span></td>
-            <td><a href="${link}" target="_blank" class="btn-view">Abrir Link</a></td>
-          </tr>`;
-      });
-    }
-
-    document.getElementById('order-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const btn = e.target.querySelector('button[type="submit"]');
-      btn.textContent = 'Gerando link...';
-      btn.disabled = true;
-
-      const data = new FormData(e.target);
+    function read_categories(container_id) {
       const cats = [];
-      
-      document.querySelectorAll('.category-setup').forEach(block => {
+      for (const block of document.querySelectorAll(`#${container_id} .category-setup`)) {
+        const name = block.querySelector('.cat-name').value.trim();
+        const price_cents = to_cents(block.querySelector('.cat-price').value);
+        if (!name) throw new Error('Dê um nome para cada categoria.');
+        if (!Number.isFinite(price_cents) || price_cents < 0) throw new Error(`Informe o preço de "${name}".`);
         const has_sizes = block.querySelector('.cat-has-sizes').checked;
-        const init_sizes = {};
-        
-        if (has_sizes) {
-          block.querySelectorAll('.init-size').forEach(input => {
-            init_sizes[input.dataset.size] = parseInt(input.value) || 0;
-          });
-        } else {
-          const single_qty = parseInt(block.querySelector('.init-qty-single').value) || 0;
-          init_sizes['Unico'] = single_qty;
-        }
-
-        cats.push({
-          name: block.querySelector('.cat-name').value,
-          price_cents: Math.round(parseFloat(block.querySelector('.cat-price').value) * 100),
-          has_sizes: has_sizes,
-          initial_sizes: init_sizes
-        });
-      });
-      
-      data.append('categories', JSON.stringify(cats));
-
-      const res = await fetch('/api/admin/orders', { method: 'POST', body: data });
-      const json = await res.json();
-      
-      const out = document.getElementById('result');
-      if (res.ok) {
-        const link = `${window.location.origin}/pagamentoseguro#${json.order.id}`;
-        out.innerHTML = `✅ Pedido criado! <br><a href="${link}" target="_blank">${link}</a>`;
-        out.style.color = '#22c55e';
-        e.target.reset();
-        document.getElementById('categories-container').innerHTML = '';
-        add_category();
-        load_orders();
-      } else {
-        out.textContent = '❌ Erro: ' + json.error;
-        out.style.color = '#ef4444';
+        const initial_sizes = {};
+        if (has_sizes) block.querySelectorAll('.init-size').forEach(i => initial_sizes[i.dataset.size] = parseInt(i.value) || 0);
+        else initial_sizes.Unico = parseInt(block.querySelector('.init-qty-single').value) || 0;
+        cats.push({ name, price_cents, has_sizes, initial_sizes });
       }
-      btn.textContent = 'Gerar Link de Personalização';
-      btn.disabled = false;
+      if (!cats.length) throw new Error('Adicione pelo menos uma categoria.');
+      return cats;
+    }
+
+    function initial_total() {
+      let total = 0;
+      document.querySelectorAll('#categories-container .category-setup').forEach(block => {
+        const price = to_cents(block.querySelector('.cat-price').value) || 0;
+        const has_sizes = block.querySelector('.cat-has-sizes').checked;
+        const qty = has_sizes
+          ? [...block.querySelectorAll('.init-size')].reduce((a, i) => a + (parseInt(i.value) || 0), 0)
+          : parseInt(block.querySelector('.init-qty-single').value) || 0;
+        total += price * qty;
+      });
+      return total;
+    }
+    function update_initial_total() { $('#initial-total').textContent = brl(initial_total()); }
+    function use_initial_total() { $('[name="amount_reais"]').value = cents_to_input(initial_total()); }
+
+    /* ---------- Novo pedido ---------- */
+    const form = $('#order-form');
+    const kind = () => document.querySelector('[name="kind"]:checked').value;
+
+    function apply_kind() {
+      const k = kind();
+      document.body.dataset.kind = k;
+      form.querySelectorAll('[data-auto-required]').forEach(i => i.required = k === 'auto');
+      form.querySelectorAll('[data-manual-required]').forEach(i => { i.required = k === 'manual'; i.disabled = k !== 'manual'; });
+      form.querySelector('[name="client_document"]').disabled = k !== 'auto';
+    }
+    document.querySelectorAll('[name="kind"]').forEach(r => r.addEventListener('change', apply_kind));
+
+    $('#photos-input').addEventListener('change', (e) => {
+      const files = [...e.target.files];
+      if (files.length > 15) toast('Máximo de 15 fotos. Só as 15 primeiras serão enviadas.', true);
+      $('#photos-preview').innerHTML = files.slice(0, 15).map(f => `<img src="${URL.createObjectURL(f)}" alt="">`).join('');
     });
 
-    async function clear_orders() {
-      if(confirm('Atenção: Isso vai apagar TODOS os pedidos. Tem certeza?')) {
-        await fetch('/api/admin/orders', { method: 'DELETE' });
-        load_orders();
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const err = $('#form-error'); err.textContent = '';
+      const invalid = [...form.querySelectorAll('input, textarea')].find(i => !i.disabled && !i.checkValidity());
+      if (invalid) { err.textContent = 'Preencha os campos obrigatórios (*).'; invalid.focus(); return; }
+
+      let cats;
+      try { cats = read_categories('categories-container'); } catch (ex) { err.textContent = ex.message; return; }
+
+      const data = new FormData(form);
+      data.set('categories', JSON.stringify(cats));
+      const btn = $('#btn-create');
+      btn.disabled = true; btn.textContent = 'Gerando link...';
+      try {
+        const url = kind() === 'manual' ? '/api/admin/manual-orders' : '/api/admin/orders';
+        const { order } = await api(url, { method: 'POST', body: data });
+        const link = link_for(order);
+        $('#created-link').value = link;
+        $('#created-open').href = link;
+        const wa = wa_link(order.client_phone, wa_message(order));
+        $('#created-wa').hidden = !wa; if (wa) $('#created-wa').href = wa;
+        form.hidden = true; $('.kind-switch').hidden = true; $('#created').hidden = false;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (ex) {
+        err.textContent = ex.message;
+      }
+      btn.disabled = false; btn.textContent = 'Gerar link do cliente';
+    });
+
+    function reset_form() {
+      form.reset();
+      $('#photos-preview').innerHTML = '';
+      $('#categories-container').innerHTML = '';
+      add_category('categories-container');
+      update_initial_total();
+      apply_kind();
+      form.hidden = false; $('.kind-switch').hidden = false; $('#created').hidden = true;
+    }
+
+    function calc_total() {
+      const v = (id) => parseFloat(document.getElementById(id).value) || 0;
+      const total = v('calc_shirt_qty') * v('calc_shirt_price') + v('calc_hat_qty') * v('calc_hat_price');
+      $('#res_total').textContent = brl(Math.round(total * 100));
+      $('#res_split').textContent = brl(Math.round(total * 50));
+    }
+
+    /* ---------- Lista de pedidos ---------- */
+    async function load_orders(manual = false) {
+      try {
+        ({ orders } = await api('/api/admin/orders'));
+        render();
+        if (manual) toast('Lista atualizada');
+      } catch (ex) {
+        $('#orders-list').innerHTML = `<p class="empty">Erro ao carregar: ${esc(ex.message)}</p>`;
       }
     }
 
-    load_orders();
+    function in_period(o, p) {
+      if (!p) return true;
+      const d = new Date(o.created_at); const now = new Date();
+      if (p === 'today') return d.toDateString() === now.toDateString();
+      if (p === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      return now - d <= Number(p) * 864e5;
+    }
+
+    function filtered() {
+      const q = $('#f-search').value.trim().toLowerCase();
+      const qd = q.replace(/\D/g, '');
+      const st = $('#f-status').value;
+      const p = $('#f-period').value;
+      return orders.filter(o => {
+        if (st && o.status !== st) return false;
+        if (!in_period(o, p)) return false;
+        if (!q) return true;
+        const text = [o.id, o.client_name, o.client_email, o.product_name].join(' ').toLowerCase();
+        const digits = [o.client_phone, o.client_document].join(' ').replace(/\D/g, '');
+        return text.includes(q) || (qd.length >= 3 && digits.includes(qd));
+      });
+    }
+
+    function items_text(o) {
+      return (o.selected_sizes || []).map(s => {
+        const parts = Object.entries(s.sizes || {}).filter(([, q]) => q > 0).map(([sz, q]) => sz === 'Unico' ? `${q} un` : `${sz}: ${q}`);
+        return parts.length ? `${s.category} (${parts.join(', ')})` : '';
+      }).filter(Boolean).join(' · ');
+    }
+
+    function render() {
+      const list = filtered();
+      const paid = list.filter(o => o.status === 'paid');
+      const pending = list.filter(o => o.status === 'pending');
+      const sold = paid.reduce((a, o) => a + (o.total_cents || 0), 0);
+      $('#st-sold').textContent = brl(sold);
+      $('#st-sold-n').textContent = `${paid.length} ${paid.length === 1 ? 'pago' : 'pagos'}`;
+      $('#st-pending').textContent = brl(pending.reduce((a, o) => a + (o.total_cents || 0), 0));
+      $('#st-pending-n').textContent = `${pending.length} ${pending.length === 1 ? 'pedido' : 'pedidos'}`;
+      $('#st-draft').textContent = list.filter(o => o.status === 'draft').length;
+      $('#st-avg').textContent = brl(paid.length ? Math.round(sold / paid.length) : 0);
+      $('#list-info').textContent = `${list.length} de ${orders.length} pedidos`;
+
+      const box = $('#orders-list');
+      if (!list.length) { box.innerHTML = `<p class="empty">${orders.length ? 'Nenhum pedido com esses filtros.' : 'Nenhum pedido ainda. Crie o primeiro em "+ Novo pedido".'}</p>`; return; }
+
+      box.innerHTML = list.map(o => {
+        const s = STATUS[o.status] || { label: o.status, cls: 'status-draft' };
+        const wa = wa_link(o.client_phone, wa_message(o));
+        const items = items_text(o);
+        const pay_btn = o.status === 'paid'
+          ? `<button class="act" onclick="undo_paid('${o.id}')" title="Voltar para aguardando">↺ Desfazer pago</button>`
+          : `<button class="act act-paid" onclick="mark_paid('${o.id}')">✓ Marcar pago</button>`;
+        return `
+        <article class="order-row">
+          <div class="o-main">
+            <div class="o-top">
+              <span class="badge-status ${s.cls}">${s.label}</span>
+              <span class="kind-tag">${o.kind === 'manual' ? 'Pix manual' : 'Pix automático'}</span>
+              <span class="o-code" title="${esc(o.id)}">#${short(o.id)}</span>
+            </div>
+            <strong class="o-name">${esc(o.client_name || 'Sem nome')}</strong>
+            <span class="o-sub">${esc(o.product_name || '')}${o.client_phone ? ' · ' + esc(o.client_phone) : ''}</span>
+          </div>
+          <div class="o-value">
+            <strong>${o.total_cents ? brl(o.total_cents) : '—'}</strong>
+            <small>${fmt_date(o.created_at)}</small>
+          </div>
+          <div class="o-actions">
+            <button class="act" onclick="copy_text('${link_for(o)}')">Copiar link</button>
+            <a class="act" href="${link_for(o)}" target="_blank">Abrir</a>
+            ${wa ? `<a class="act act-wa" href="${wa}" target="_blank">WhatsApp</a>` : ''}
+            ${pay_btn}
+            <button class="act" onclick="open_edit('${o.id}')">Editar</button>
+            <button class="act" onclick="duplicate('${o.id}')">Duplicar</button>
+            <button class="act act-del" onclick="remove('${o.id}')" title="Excluir">Excluir</button>
+          </div>
+          <details class="o-details">
+            <summary>Detalhes</summary>
+            <dl>
+              <dt>Código</dt><dd>${esc(o.id)}</dd>
+              <dt>E-mail</dt><dd>${esc(o.client_email || '—')}</dd>
+              <dt>CPF/CNPJ</dt><dd>${esc(o.client_document || '—')}</dd>
+              <dt>Itens escolhidos</dt><dd>${esc(items || 'O cliente ainda não confirmou.')}</dd>
+              <dt>Fotos</dt><dd>${(o.photos || []).length}</dd>
+              <dt>Pago em</dt><dd>${o.paid_at ? fmt_date(o.paid_at) + (o.paid_by === 'painel' ? ' (marcado no painel)' : o.paid_by === 'webhook' ? ' (PinguPag)' : '') : '—'}</dd>
+              ${o.mp_payment_id ? `<dt>Transação</dt><dd>${esc(o.mp_payment_id)}</dd>` : ''}
+            </dl>
+          </details>
+        </article>`;
+      }).join('');
+    }
+    ['f-search', 'f-status', 'f-period'].forEach(id => document.getElementById(id).addEventListener('input', render));
+
+    const find = (id) => orders.find(o => o.id === id);
+
+    async function patch(id, body, msg) {
+      try { await api(`/api/admin/orders/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); toast(msg); await load_orders(); }
+      catch (ex) { toast(ex.message, true); }
+    }
+
+    async function mark_paid(id) {
+      const o = find(id);
+      await ask('Marcar como pago?', `Confirme que o Pix de <b>${o.total_cents ? brl(o.total_cents) : 'valor não definido'}</b> de <b>${esc(o.client_name)}</b> caiu na sua conta. A página do cliente vai mostrar "Pagamento confirmado".`, { ok: 'Sim, está pago' });
+      patch(id, { status: 'paid' }, 'Pedido marcado como pago');
+    }
+    async function undo_paid(id) {
+      await ask('Desfazer pagamento?', 'O pedido volta para "Aguardando pagamento".');
+      patch(id, { status: 'pending' }, 'Pagamento desfeito');
+    }
+    async function duplicate(id) {
+      try { const { order } = await api(`/api/admin/orders/${id}/duplicate`, { method: 'POST' }); await load_orders(); copy_text(link_for(order)); toast('Pedido duplicado. Link copiado!'); }
+      catch (ex) { toast(ex.message, true); }
+    }
+    async function remove(id) {
+      const o = find(id);
+      await ask('Excluir pedido?', `O pedido de <b>${esc(o.client_name)}</b> (#${short(id)}) será apagado de vez, e o link do cliente vai parar de funcionar.`, { danger: true, ok: 'Excluir' });
+      try { await api(`/api/admin/orders/${id}`, { method: 'DELETE' }); toast('Pedido excluído'); await load_orders(); }
+      catch (ex) { toast(ex.message, true); }
+    }
+    async function open_delete_all() {
+      await ask('Apagar TODOS os pedidos?', `Isso apaga os <b>${orders.length}</b> pedidos do banco de dados e não dá para desfazer. Exporte o CSV antes, se quiser guardar.<br><br>Digite <b>APAGAR TUDO</b> para confirmar.`, { danger: true, typed: 'APAGAR TUDO', ok: 'Apagar todos' });
+      try { await api('/api/admin/orders', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: 'APAGAR TUDO' }) }); toast('Todos os pedidos foram apagados'); await load_orders(); }
+      catch (ex) { toast(ex.message, true); }
+    }
+
+    /* ---------- Edição ---------- */
+    function open_edit(id) {
+      const o = find(id); editing = o;
+      const f = $('#edit-form');
+      $('#edit-code').textContent = '#' + short(id);
+      for (const k of ['client_name', 'client_phone', 'client_email', 'client_document', 'product_name', 'product_description', 'status']) f.elements[k].value = o[k] || '';
+      const manual = o.kind === 'manual';
+      f.querySelectorAll('.edit-manual').forEach(el => el.hidden = !manual);
+      f.elements.amount_reais.value = manual ? cents_to_input(o.total_cents) : '';
+      f.elements.payment_link.value = manual ? (o.payment_link || '') : '';
+      $('#edit-note').textContent = o.status === 'draft' ? '' : 'O cliente já confirmou este pedido. Mudar as categorias não altera o Pix que já foi gerado.';
+      $('#edit-categories').innerHTML = '';
+      (o.available_categories || []).forEach(c => add_category('edit-categories', c));
+      $('#edit-error').textContent = '';
+      open_modal('modal-edit');
+    }
+
+    $('#edit-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = e.target; const err = $('#edit-error'); err.textContent = '';
+      const body = {};
+      for (const k of ['client_name', 'client_phone', 'client_email', 'client_document', 'product_name', 'product_description', 'status']) body[k] = f.elements[k].value;
+      try { body.available_categories = read_categories('edit-categories'); } catch (ex) { err.textContent = ex.message; return; }
+      if (editing.kind === 'manual') {
+        body.total_cents = to_cents(f.elements.amount_reais.value);
+        if (!(body.total_cents > 0)) { err.textContent = 'Informe o valor total.'; return; }
+        body.payment_link = f.elements.payment_link.value;
+      }
+      try {
+        await api(`/api/admin/orders/${editing.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        close_modal('modal-edit'); toast('Pedido salvo'); load_orders();
+      } catch (ex) { err.textContent = ex.message; }
+    });
+
+    /* ---------- CSV (abre no Excel) ---------- */
+    function export_csv() {
+      const list = filtered();
+      if (!list.length) return toast('Nenhum pedido para exportar.', true);
+      const head = ['Código', 'Criado em', 'Cliente', 'E-mail', 'CPF/CNPJ', 'Telefone', 'Produto', 'Tipo', 'Situação', 'Valor (R$)', 'Itens', 'Pago em'];
+      const rows = list.map(o => [
+        o.id, fmt_date(o.created_at), o.client_name, o.client_email, o.client_document, o.client_phone, o.product_name,
+        o.kind === 'manual' ? 'Pix manual' : 'Pix automático', (STATUS[o.status] || {}).label || o.status,
+        o.total_cents ? cents_to_input(o.total_cents) : '', items_text(o), o.paid_at ? fmt_date(o.paid_at) : ''
+      ]);
+      const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const csv = '﻿' + [head, ...rows].map(r => r.map(cell).join(';')).join('\r\n');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+      a.download = `pedidos-bravus-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+    }
+
+    /* ---------- Início ---------- */
+    add_category('categories-container');
+    update_initial_total();
+    apply_kind();
+    show_tab(location.hash === '#novo' ? 'novo' : 'pedidos');
+    // Atualiza a lista sozinha a cada 30 segundos (para ver pagamentos chegando)
+    setInterval(() => {
+      const modal_open = [...document.querySelectorAll('.modal-overlay')].some(m => m.style.display === 'flex');
+      if (!$('#tab-pedidos').hidden && !document.hidden && !modal_open) load_orders();
+    }, 30000);
   </script>
 </body>
 </html>

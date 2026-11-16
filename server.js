@@ -4,10 +4,10 @@ dns.setServers(['8.8.8.8', '1.1.1.1']);
 import 'dotenv/config';
 import express from 'express';
 import multer from 'multer';
-import { randomBytes, randomUUID } from 'crypto';
+import { randomBytes, randomUUID, createHash, createHmac, timingSafeEqual } from 'crypto';
 import path from 'path';
 import fs from 'fs';
-import { create_order, get_orders, get_order, update_order, delete_all_orders } from './db.js';
+import { create_order, get_orders, get_order, update_order, delete_order, delete_all_orders } from './db.js';
 import { create_transaction } from './pingupag.js';
 
 const app = express();
@@ -16,6 +16,91 @@ const base = process.env.PUBLIC_BASE_URL || `http://localhost:${port}`;
 
 fs.mkdirSync('uploads', { recursive: true });
 
+/* ---------- Utilidades ---------- */
+
+// Código do pedido: 24 caracteres aleatórios, impossível de adivinhar.
+const new_id = () => randomBytes(12).toString('hex');
+
+function safe_equal(a, b) {
+  const x = Buffer.from(String(a ?? ''));
+  const y = Buffer.from(String(b ?? ''));
+  return x.length === y.length && timingSafeEqual(x, y);
+}
+
+// Assinatura do endereço de aviso de pagamento. Usa WEBHOOK_SECRET se existir;
+// senão deriva uma chave fixa do MONGODB_URI, que já é secreto.
+const webhook_secret = process.env.WEBHOOK_SECRET
+  || createHash('sha256').update('bravus-webhook:' + process.env.MONGODB_URI).digest('hex');
+const sign = (order_id) => createHmac('sha256', webhook_secret).update(String(order_id)).digest('hex').slice(0, 32);
+
+const order_kind = (o) => o.kind || (typeof o.qr_image === 'string' && o.qr_image.startsWith('/uploads/') ? 'manual' : 'auto');
+
+// O que o cliente pode ver: sem CPF, telefone, e-mail nem ID da transação.
+function public_order(o) {
+  const show_pix = o.status === 'pending';
+  return {
+    id: o.id,
+    kind: order_kind(o),
+    status: o.status,
+    first_name: String(o.client_name || '').trim().split(/\s+/)[0] || '',
+    photos: o.photos || [],
+    product_name: o.product_name,
+    product_description: o.product_description,
+    available_categories: o.available_categories || [],
+    selected_sizes: o.selected_sizes || [],
+    total_cents: o.total_cents || 0,
+    payment_link: show_pix ? o.payment_link : null,
+    qr_image: show_pix ? o.qr_image : null,
+    expires_at: o.expires_at || null,
+    paid_at: o.paid_at || null
+  };
+}
+
+// Na lista do painel, a imagem base64 do QR é pesada e não é usada.
+function admin_order(o) {
+  const { _id, __v, ...rest } = o;
+  if (rest.qr_image && !rest.qr_image.startsWith('/uploads/')) rest.qr_image = '(imagem da PinguPag)';
+  return { ...rest, kind: order_kind(o) };
+}
+
+function parse_categories(raw) {
+  let cats;
+  try { cats = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch { throw new Error('Categorias inválidas.'); }
+  if (!Array.isArray(cats) || !cats.length) throw new Error('Adicione pelo menos uma categoria.');
+  return cats.map(c => {
+    const name = String(c.name || '').trim();
+    const price_cents = Math.round(Number(c.price_cents));
+    if (!name) throw new Error('Toda categoria precisa de um nome.');
+    if (!Number.isFinite(price_cents) || price_cents < 0) throw new Error(`Preço inválido em "${name}".`);
+    const initial_sizes = {};
+    for (const [k, v] of Object.entries(c.initial_sizes || {})) initial_sizes[String(k)] = Math.max(0, Math.min(9999, parseInt(v) || 0));
+    return { name, price_cents, has_sizes: !!c.has_sizes, initial_sizes };
+  });
+}
+
+// Confere as quantidades escolhidas pelo cliente e calcula o total no servidor.
+function parse_selection(order, selected_sizes) {
+  if (!Array.isArray(selected_sizes)) throw new Error('Seleção inválida.');
+  let total_cents = 0;
+  const clean = [];
+  for (const sel of selected_sizes) {
+    const cat = (order.available_categories || []).find(c => c.name === sel?.category);
+    if (!cat) continue;
+    const sizes = {};
+    for (const [size, qty] of Object.entries(sel.sizes || {})) {
+      const q = Math.max(0, Math.min(9999, parseInt(qty) || 0));
+      sizes[String(size)] = q;
+      total_cents += cat.price_cents * q;
+    }
+    clean.push({ category: cat.name, sizes });
+  }
+  return { selected_sizes: clean, total_cents };
+}
+
+const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+
+/* ---------- Upload de fotos ---------- */
+
 const upload = multer({
   storage: multer.diskStorage({
     destination: 'uploads/',
@@ -23,147 +108,237 @@ const upload = multer({
   }),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (!/^image\/(jpe?g|png|webp)$/.test(file.mimetype)) return cb(new Error('Apenas imagens'));
+    if (!/^image\/(jpe?g|png|webp)$/.test(file.mimetype)) return cb(new Error('Apenas imagens JPG, PNG ou WEBP.'));
     cb(null, true);
   }
 });
 
-app.use(express.json());
-app.use('/uploads', express.static('uploads'));
+/* ---------- Senha do painel ---------- */
+
+const admin_user = process.env.ADMIN_USER || 'admin';
+const admin_pass = process.env.ADMIN_PASSWORD || 'admin123';
+if (!process.env.ADMIN_PASSWORD) console.warn('AVISO: ADMIN_PASSWORD não definido. Usando a senha padrão, que é insegura.');
 
 function basic_auth(req, res, next) {
-  const user = process.env.ADMIN_USER || 'admin';
-  const pass = process.env.ADMIN_PASSWORD || 'admin123';
   const b64auth = (req.headers.authorization || '').split(' ')[1] || '';
-  const [login, password] = Buffer.from(b64auth, 'base64').toString().split(':');
-  if (login === user && password === pass) return next();
+  const decoded = Buffer.from(b64auth, 'base64').toString();
+  const sep = decoded.indexOf(':');
+  const login = decoded.slice(0, sep);
+  const password = decoded.slice(sep + 1);
+  if (sep > -1 && safe_equal(login, admin_user) && safe_equal(password, admin_pass)) return next();
   res.set('WWW-Authenticate', 'Basic realm="Painel"');
   res.status(401).send('Acesso negado.');
 }
 
-app.use('/admin.html', basic_auth);
-app.use('/manual.html', basic_auth); 
-app.use('/limpar.html', basic_auth);
-app.use('/api/admin', basic_auth);
+app.use(express.json({ limit: '1mb' }));
+app.use('/uploads', express.static('uploads'));
+
+app.use(['/admin.html', '/api/admin'], basic_auth);
+// Telas antigas do painel agora ficam dentro do admin.html.
+app.get(['/manual.html', '/limpar.html'], basic_auth, (_req, res) => res.redirect('/admin.html'));
 app.use(express.static('public'));
 
-// ROTA: CRIAR PEDIDO NORMAL (PINGUPAG)
-app.post('/api/admin/orders', upload.array('photos', 15), async (req, res) => {
-  try {
-    const { client_name, client_email, client_document, client_phone, categories, product_name, product_description } = req.body;
-    const photos = req.files ? req.files.map(f => `/uploads/${f.filename}`) : [];
-    const new_order = {
-      id: randomBytes(3).toString('hex'),
-      client_name, client_email, client_document, client_phone,
-      photos,
-      product_name: product_name || 'Camisa personalizada',
-      product_description: product_description || 'Modelo esportivo',
-      available_categories: JSON.parse(categories),
-      status: 'draft',
-      total_cents: 0
-    };
-    await create_order(new_order);
-    res.json({ order: await get_order(new_order.id) });
-  } catch (error) { res.status(500).json({ error: error.message }); }
-});
+/* ---------- Painel: pedidos ---------- */
 
-// ROTA: CHECKOUT NORMAL (GERA O PIX NA PINGUPAG)
-app.post('/api/orders/:id/checkout', async (req, res) => {
-  try {
-    const { selected_sizes } = req.body;
-    const order = await get_order(req.params.id);
-    if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
+app.get('/api/admin/orders', wrap(async (_req, res) => {
+  res.json({ orders: (await get_orders()).map(admin_order) });
+}));
 
-    let total_cents = 0;
-    selected_sizes.forEach(sel => {
-      const category_info = order.available_categories.find(c => c.name === sel.category);
-      if (category_info) {
-        for (const [size, qty] of Object.entries(sel.sizes)) {
-          total_cents += (category_info.price_cents * qty);
-        }
-      }
-    });
+// Pedido com Pix automático (PinguPag)
+app.post('/api/admin/orders', upload.array('photos', 15), wrap(async (req, res) => {
+  const { client_name, client_email, client_document, client_phone, categories, product_name, product_description } = req.body;
+  if (!String(client_name || '').trim()) return res.status(400).json({ error: 'Informe o nome do cliente.' });
+  const new_order = {
+    id: new_id(),
+    kind: 'auto',
+    client_name, client_email, client_document, client_phone,
+    photos: (req.files || []).map(f => `/uploads/${f.filename}`),
+    product_name: product_name || 'Camisa personalizada',
+    product_description: product_description || 'Modelo esportivo',
+    available_categories: parse_categories(categories),
+    status: 'draft',
+    total_cents: 0
+  };
+  await create_order(new_order);
+  res.json({ order: admin_order(await get_order(new_order.id)) });
+}));
 
-    if (total_cents === 0) return res.status(400).json({ error: 'Selecione pelo menos um item.' });
+// Pedido com Pix manual (QR do banco)
+app.post('/api/admin/manual-orders', upload.fields([{ name: 'photos', maxCount: 15 }, { name: 'qr_image', maxCount: 1 }]), wrap(async (req, res) => {
+  const { client_name, client_email, client_phone, amount_reais, pix_code, categories, product_name, product_description } = req.body;
+  const files = req.files || {};
+  if (!String(client_name || '').trim() || !amount_reais || !String(pix_code || '').trim() || !files.qr_image) {
+    return res.status(400).json({ error: 'Preencha nome, valor, Pix copia e cola e a foto do QR Code.' });
+  }
+  const total_cents = Math.round(parseFloat(String(amount_reais).replace(',', '.')) * 100);
+  if (!Number.isFinite(total_cents) || total_cents <= 0) return res.status(400).json({ error: 'Valor inválido.' });
 
-    const tx = await create_transaction({ ...order, total_cents }, base);
-    
-    await update_order(order.id, {
-      selected_sizes,
-      total_cents,
-      status: 'pending',
-      payment_link: tx.payment_link,
-      qr_image: tx.qr_image, // Salva a imagem base64 da PinguPag
-      mp_payment_id: tx.transaction_id
-    });
+  const new_order = {
+    id: new_id(),
+    kind: 'manual',
+    client_name, client_email: client_email || '', client_document: '', client_phone: client_phone || '',
+    total_cents, payment_link: String(pix_code).trim(),
+    qr_image: `/uploads/${files.qr_image[0].filename}`,
+    photos: (files.photos || []).map(f => `/uploads/${f.filename}`),
+    product_name: product_name || 'Pedido Manual',
+    product_description: product_description || 'Personalizado',
+    available_categories: parse_categories(categories),
+    status: 'draft', selected_sizes: []
+  };
+  await create_order(new_order);
+  res.json({ order: admin_order(await get_order(new_order.id)) });
+}));
 
-    res.json({ success: true, payment_link: tx.payment_link });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// ROTAS MANUAIS (MANTIDAS INTACTAS)
-app.post('/api/admin/manual-orders', upload.fields([{ name: 'photos', maxCount: 15 }, { name: 'qr_image', maxCount: 1 }]), async (req, res) => {
-  try {
-    const { client_name, client_email, amount_reais, pix_code, categories, product_name, product_description } = req.body;
-    if (!client_name || !amount_reais || !pix_code || !req.files['qr_image']) return res.status(400).json({ error: 'Preencha os dados.' });
-
-    const photos = req.files['photos'] ? req.files['photos'].map(f => `/uploads/${f.filename}`) : [];
-    const manual_qr_path = `/uploads/${req.files['qr_image'][0].filename}`;
-    const total_cents = Math.round(parseFloat(amount_reais) * 100);
-
-    const new_order = {
-      id: randomBytes(3).toString('hex'), client_name, client_email: client_email || 'nao-informado@email.com',
-      client_document: '00000000000', client_phone: '00000000000', total_cents, payment_link: pix_code,
-      qr_image: manual_qr_path, photos, product_name: product_name || 'Pedido Manual',
-      product_description: product_description || 'Personalizado', available_categories: JSON.parse(categories),
-      status: 'draft', selected_sizes: []
-    };
-    await create_order(new_order);
-    res.json({ order: await get_order(new_order.id) });
-  } catch (error) { res.status(500).json({ error: error.message }); }
-});
-
-app.post('/api/manual-orders/:id/confirm', async (req, res) => {
-  try {
-    const order = await get_order(req.params.id);
-    if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
-    const expires_at = new Date(Date.now() + 10 * 60 * 1000);
-    await update_order(order.id, { status: 'pending', expires_at });
-    res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.get('/api/manual-orders/:id', async (req, res) => {
+// Editar um pedido (dados do cliente, produto, categorias, situação, valor/Pix manual)
+app.patch('/api/admin/orders/:id', wrap(async (req, res) => {
   const order = await get_order(req.params.id);
   if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
-  res.json({ order });
-});
 
-// OUTRAS ROTAS
-app.get('/api/admin/orders', async (_req, res) => res.json({ orders: await get_orders() }));
-app.delete('/api/admin/orders', async (req, res) => { await delete_all_orders(); res.json({ success: true }); });
-app.get('/api/orders/:id', async (req, res) => {
+  const b = req.body || {};
+  const set = {};
+  const unset = {};
+  for (const f of ['client_name', 'client_email', 'client_document', 'client_phone', 'product_name', 'product_description']) {
+    if (typeof b[f] === 'string') set[f] = b[f].trim();
+  }
+  if (b.available_categories !== undefined) set.available_categories = parse_categories(b.available_categories);
+
+  if (order_kind(order) === 'manual') {
+    if (b.total_cents !== undefined) {
+      const t = Math.round(Number(b.total_cents));
+      if (!Number.isFinite(t) || t <= 0) return res.status(400).json({ error: 'Valor inválido.' });
+      set.total_cents = t;
+    }
+    if (typeof b.payment_link === 'string' && b.payment_link.trim()) set.payment_link = b.payment_link.trim();
+  }
+
+  if (b.status !== undefined) {
+    if (!['draft', 'pending', 'paid', 'rejected'].includes(b.status)) return res.status(400).json({ error: 'Situação inválida.' });
+    set.status = b.status;
+    if (b.status === 'paid' && order.status !== 'paid') { set.paid_at = new Date(); set.paid_by = 'painel'; }
+    if (b.status !== 'paid') { unset.paid_at = ''; unset.paid_by = ''; }
+    // Ao voltar um Pix manual para "aguardando", o cliente ganha mais 10 minutos.
+    if (b.status === 'pending' && order_kind(order) === 'manual') set.expires_at = new Date(Date.now() + 10 * 60 * 1000);
+  }
+
+  await update_order(order.id, set, unset);
+  res.json({ order: admin_order(await get_order(order.id)) });
+}));
+
+// Duplicar: mesmo cliente, produto e categorias, sem pagamento.
+app.post('/api/admin/orders/:id/duplicate', wrap(async (req, res) => {
+  const o = await get_order(req.params.id);
+  if (!o) return res.status(404).json({ error: 'Pedido não encontrado' });
+  const kind = order_kind(o);
+  const copy = {
+    id: new_id(), kind,
+    client_name: o.client_name, client_email: o.client_email, client_document: o.client_document, client_phone: o.client_phone,
+    photos: o.photos || [], product_name: o.product_name, product_description: o.product_description,
+    available_categories: o.available_categories || [], status: 'draft', selected_sizes: [],
+    total_cents: kind === 'manual' ? o.total_cents : 0
+  };
+  if (kind === 'manual') { copy.payment_link = o.payment_link; copy.qr_image = o.qr_image; }
+  await create_order(copy);
+  res.json({ order: admin_order(await get_order(copy.id)) });
+}));
+
+app.delete('/api/admin/orders/:id', wrap(async (req, res) => {
+  const r = await delete_order(req.params.id);
+  if (!r.deletedCount) return res.status(404).json({ error: 'Pedido não encontrado' });
+  res.json({ success: true });
+}));
+
+// Apagar todos exige a palavra de confirmação, para não acontecer por engano.
+app.delete('/api/admin/orders', wrap(async (req, res) => {
+  if ((req.body || {}).confirm !== 'APAGAR TUDO') return res.status(400).json({ error: 'Confirmação ausente.' });
+  await delete_all_orders();
+  res.json({ success: true });
+}));
+
+/* ---------- Cliente ---------- */
+
+const send_public = wrap(async (req, res) => {
   const order = await get_order(req.params.id);
-  if (!order) return res.status(404).json({ error: 'Não encontrado' });
-  res.json({ order });
+  if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
+  res.set('Cache-Control', 'no-store');
+  res.json({ order: public_order(order) });
 });
+app.get('/api/orders/:id', send_public);
+app.get('/api/manual-orders/:id', send_public); // endereço antigo
 
-// WEBHOOK PINGUPAG
+// Pix automático: calcula o total e gera o Pix na PinguPag
+app.post('/api/orders/:id/checkout', wrap(async (req, res) => {
+  const order = await get_order(req.params.id);
+  if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
+  if (order_kind(order) === 'manual') return res.status(400).json({ error: 'Este pedido usa Pix manual.' });
+  if (order.status === 'paid') return res.status(400).json({ error: 'Este pedido já foi pago.' });
+
+  const { selected_sizes, total_cents } = parse_selection(order, (req.body || {}).selected_sizes);
+  if (total_cents === 0) return res.status(400).json({ error: 'Selecione pelo menos um item.' });
+
+  const postback_url = `${base}/api/webhook/pingupag?sig=${sign(order.id)}`;
+  const tx = await create_transaction({ ...order, total_cents, postback_url }, base);
+
+  await update_order(order.id, {
+    selected_sizes,
+    total_cents,
+    status: 'pending',
+    payment_link: tx.payment_link,
+    qr_image: tx.qr_image,
+    mp_payment_id: tx.transaction_id
+  });
+  res.json({ success: true });
+}));
+
+// Pix manual: o cliente confirma os tamanhos e recebe o QR com prazo de 10 minutos
+app.post('/api/manual-orders/:id/confirm', wrap(async (req, res) => {
+  const order = await get_order(req.params.id);
+  if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
+  if (order.status === 'paid') return res.status(400).json({ error: 'Este pedido já foi pago.' });
+  const { selected_sizes } = parse_selection(order, (req.body || {}).selected_sizes);
+  await update_order(order.id, { status: 'pending', selected_sizes, expires_at: new Date(Date.now() + 10 * 60 * 1000) });
+  res.json({ success: true });
+}));
+
+/* ---------- Aviso de pagamento da PinguPag ---------- */
+
 app.post('/api/webhook/pingupag', async (req, res) => {
   try {
-    const payload = req.body;
-    const order_id = payload.external_id || payload.store_reference;
-    
-    if (order_id && payload.status === 'approved') {
-      await update_order(order_id, { status: 'paid', mp_payment_id: payload.transaction_id || 'pingupag', paid_at: new Date().toISOString() });
-    } else if (order_id && (payload.status === 'failed' || payload.status === 'refunded')) {
-      await update_order(order_id, { status: 'rejected' });
+    const payload = req.body || {};
+    const order_id = payload.external_id || payload.store_reference || payload.reference;
+    const order = order_id ? await get_order(order_id) : null;
+    if (!order) return res.sendStatus(200);
+
+    // Só aceita o aviso se o endereço tiver a assinatura deste pedido
+    // ou se o ID da transação for o mesmo que a PinguPag nos devolveu.
+    const tx_id = payload.transaction_id || payload.id;
+    const sig_ok = safe_equal(req.query.sig, sign(order.id));
+    const tx_ok = !!order.mp_payment_id && !!tx_id && String(tx_id) === String(order.mp_payment_id);
+    if (!sig_ok && !tx_ok) {
+      console.warn(`[Webhook] Aviso recusado para o pedido #${order.id}: assinatura inválida.`);
+      return res.sendStatus(401);
+    }
+
+    if (payload.status === 'approved' && order.status !== 'paid') {
+      await update_order(order.id, { status: 'paid', paid_by: 'webhook', paid_at: new Date() });
+    } else if ((payload.status === 'failed' || payload.status === 'refunded') && order.status !== 'paid') {
+      await update_order(order.id, { status: 'rejected' });
+    } else if (payload.status === 'refunded') {
+      await update_order(order.id, { status: 'rejected' }, { paid_at: '', paid_by: '' });
     }
     res.sendStatus(200);
-  } catch (err) { res.sendStatus(500); }
+  } catch (err) { console.error('[Webhook]', err); res.sendStatus(500); }
 });
 
-app.get('/pagamentoseguro', (_req, res) => res.sendFile(path.resolve('public/order.html')));
-app.get('/pagamentomanual', (_req, res) => res.sendFile(path.resolve('public/manual_pay.html')));
+/* ---------- Páginas ---------- */
+
+// As duas páginas antigas agora usam a mesma tela; os links já enviados continuam valendo.
+app.get(['/pagamentoseguro', '/pagamentomanual'], (_req, res) => res.sendFile(path.resolve('public/order.html')));
+
+// Erros: devolve uma mensagem legível em vez de travar
+app.use((err, _req, res, _next) => {
+  const status = err instanceof multer.MulterError || /inválid|Adicione|precisa/i.test(err.message) ? 400 : 500;
+  if (status === 500) console.error(err);
+  res.status(status).json({ error: err.message || 'Erro inesperado.' });
+});
 
 app.listen(port, () => console.log(`Rodando em ${base}`));

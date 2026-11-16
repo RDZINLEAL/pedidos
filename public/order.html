@@ -2,110 +2,109 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#050505">
   <title>Finalização do Pedido - Bravus</title>
   <link rel="icon" type="image/png" href="/favicon.png">
-  <link rel="stylesheet" href="/style.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
 </head>
 <body class="dark-theme">
   <div class="mobile-container">
-    
     <div class="brand-header">
-      <img src="/assets/banner.png" class="top-banner-img">
+      <img src="/assets/banner.png" class="top-banner-img" alt="Bravus">
     </div>
 
     <div class="status-banner" id="status-banner">
-      <img src="/assets/Nova pasta/08_status_aguardando_pagamento_transparent.png" alt="Status">
-      <span>Aguardando Pagamento</span>
+      <img src="/assets/Nova pasta/08_status_aguardando_pagamento_transparent.png" alt="">
+      <span>Aguardando pagamento</span>
+      <i class="live-dot" title="Verificando o pagamento automaticamente"></i>
     </div>
 
-    <div id="app-content"></div>
+    <div id="app-content"><p class="loading">Carregando seu pedido...</p></div>
 
-    <div class="support-footer" onclick="window.open('https://wa.me/5511927078767', '_blank')">
+    <a class="support-footer" id="support" href="https://wa.me/5511927078767" target="_blank" rel="noopener">
       <div class="support-left">
-        <img src="/assets/Nova pasta/04_suporte_atendimento_transparent.png">
+        <img src="/assets/Nova pasta/04_suporte_atendimento_transparent.png" alt="">
         <span>Precisa de ajuda? Fale com nossa equipe.</span>
       </div>
       <span class="arrow">›</span>
-    </div>
-
-    <div class="modal-overlay" id="modal-alter">
-      <div class="modal-box">
-        <h3>Atenção</h3>
-        <p>Você está prestes a alterar a quantidade. Deseja prosseguir?</p>
-        <div class="modal-btns">
-          <button class="btn-cancel" onclick="close_alter_modal()">Cancelar</button>
-          <button class="btn-ok" onclick="confirm_alter()">Sim, alterar</button>
-        </div>
-      </div>
-    </div>
+    </a>
 
     <div class="modal-overlay" id="modal-review">
       <div class="modal-box review-box">
         <h3>Confirme seu pedido</h3>
-        <p>Revise os itens abaixo. Depois de confirmar, geramos o Pix para pagamento.</p>
+        <p id="review-text">Revise os itens abaixo.</p>
         <div id="review-lines" class="review-lines"></div>
         <div class="review-total"><span>Total</span><strong class="yellow-text" id="review-total">R$ 0,00</strong></div>
         <div class="modal-btns">
           <button class="btn-cancel" onclick="close_review()">Voltar</button>
-          <button class="btn-ok" onclick="confirm_review()">Confirmar e gerar Pix</button>
+          <button class="btn-ok" id="review-ok" onclick="submit_order()">Confirmar e gerar Pix</button>
         </div>
       </div>
     </div>
-
   </div>
 
-  <script>
-    const id = window.location.hash ? window.location.hash.replace('#', '') : window.location.pathname.split('/').pop();
-    let orderData = null;
-    let selection = {}; 
-    let pendingChange = null; 
-    let modalShown = false; 
+  <div class="toast" id="toast"></div>
 
-    async function init() {
-      if (!id) return;
-      try {
-        const res = await fetch('/api/orders/' + id);
-        if (!res.ok) throw new Error('Pedido não encontrado');
-        
-        const { order } = await res.json();
-        orderData = order;
-        
-        if (order.status === 'paid') {
-          document.getElementById('app-content').innerHTML = `
-            <div class="card" style="text-align:center; padding: 40px 20px;">
-              <h2 class="yellow-text">Pagamento Confirmado!</h2>
-              <p style="color:#aaa; margin-top:10px;">Seu pedido já está em produção.</p>
-            </div>`;
-          document.getElementById('status-banner').style.display = 'none';
-          document.querySelector('.support-footer').style.display = 'none';
-        } else if (order.status === 'pending') {
-          show_payment_screen(order);
-        } else {
-          build_customization_ui(order);
-        }
-      } catch (err) {
-        document.getElementById('app-content').innerHTML = `<h1 style="color:white;text-align:center;margin-top:50px;">${err.message}</h1>`;
-      }
+  <script>
+    const SIZES = ['PP', 'P', 'M', 'G', 'GG', 'XG', 'XGG', 'G1', 'G2', 'G3', 'G4', 'G5'];
+    const WHATSAPP = '5511927078767';
+    const id = (location.hash.replace('#', '') || location.pathname.split('/').pop()).trim();
+    let order = null;
+    let selection = {};
+    let poll = null;
+    let timer = null;
+
+    const $ = (s) => document.querySelector(s);
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const brl = (c) => 'R$ ' + ((c || 0) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const is_manual = () => order.kind === 'manual';
+
+    function toast(msg) {
+      const t = $('#toast'); t.textContent = msg; t.className = 'toast show';
+      clearTimeout(t._h); t._h = setTimeout(() => t.className = 'toast', 2200);
+    }
+    function set_support(text) {
+      $('#support').href = `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(text)}`;
     }
 
-    function build_customization_ui(order) {
-      document.getElementById('status-banner').style.display = 'none'; 
+    async function fetch_order() {
+      const res = await fetch('/api/orders/' + encodeURIComponent(id), { cache: 'no-store' });
+      if (!res.ok) throw new Error('Pedido não encontrado');
+      return (await res.json()).order;
+    }
 
-      let carousel_html = '';
-      let img_count = 0;
-      
-      if (order.photos && order.photos.length > 0) {
-        order.photos.forEach(photo => {
-          carousel_html += `<div class="carousel-slide"><img src="${photo}" draggable="false"></div>`;
-          img_count++;
-        });
-      }
+    async function init() {
+      if (!id || id === 'pagamentoseguro' || id === 'pagamentomanual') return show_error('Link incompleto. Peça um novo link para a nossa equipe.');
+      try { order = await fetch_order(); } catch (err) { return show_error(err.message); }
+      set_support(`Olá! Preciso de ajuda com o pedido #${order.id.slice(0, 6).toUpperCase()}.`);
+      route();
+    }
 
-      const first_name = (order.client_name || '').trim().split(' ')[0];
+    function route() {
+      stop_poll();
+      $('#status-banner').style.display = order.status === 'pending' ? 'flex' : 'none';
+      if (order.status === 'paid') return show_paid();
+      if (order.status === 'rejected') return show_rejected();
+      if (order.status === 'pending') { show_payment(); start_poll(); return; }
+      show_selection();
+    }
 
-      let html = `
+    function show_error(msg) {
+      $('#status-banner').style.display = 'none';
+      $('#app-content').innerHTML = `<div class="card state-card"><h2>${esc(msg)}</h2><p>Confira se o link está completo ou fale com a gente pelo WhatsApp.</p></div>`;
+    }
+
+    /* ---------- 1. Escolha das quantidades ---------- */
+    function show_selection() {
+      const photos = order.photos || [];
+      selection = {};
+      order.available_categories.forEach(cat => {
+        selection[cat.name] = cat.has_sizes ? { ...(cat.initial_sizes || {}) } : { Unico: (cat.initial_sizes || {}).Unico || 0 };
+      });
+
+      $('#app-content').innerHTML = `
         <ol class="steps">
           <li class="active"><b>1</b>Confirmação</li>
           <li><b>2</b>Pagamento</li>
@@ -113,297 +112,303 @@
         </ol>
 
         <div class="confirm-head">
-          <span class="confirm-tag">Pedido #${esc(order.id)}</span>
+          <span class="confirm-tag">Pedido #${esc(order.id.slice(0, 6).toUpperCase())}</span>
           <h1 class="title-main">Confirmação do <span class="yellow-text">Pedido</span></h1>
-          <p class="subtitle">${first_name ? `Olá, ${esc(first_name)}! ` : ''}Confira os itens e as quantidades por tamanho. Se precisar, ajuste antes de confirmar.</p>
+          <p class="subtitle">${order.first_name ? `Olá, ${esc(order.first_name)}! ` : ''}Confira os itens e as quantidades por tamanho. Toque em + ou − para ajustar.</p>
         </div>
 
-        <div class="carousel-container" style="display:${img_count > 0 ? 'block' : 'none'}">
-          <div class="carousel-track" id="carousel">${carousel_html}</div>
-          <div id="carousel-hint" style="display:${img_count > 1 ? 'block' : 'none'}; text-align:center; font-size:11px; color:#facc15; padding:5px; background:rgba(0,0,0,0.5);">← Deslize para o lado →</div>
-        </div>
+        ${photos.length ? `
+        <div class="carousel-container">
+          <div class="carousel-track" id="carousel">${photos.map(p => `<div class="carousel-slide"><img src="${esc(p)}" draggable="false" alt=""></div>`).join('')}</div>
+          ${photos.length > 1 ? `<div class="carousel-dots" id="dots">${photos.map((_, i) => `<i class="${i ? '' : 'on'}"></i>`).join('')}</div>` : ''}
+        </div>` : ''}
 
         <div class="product-head">
-          <div class="icon-box"><img src="/assets/Nova pasta/01_selo_seguranca_transparent.png"></div>
-          <div>
-            <strong>${order.product_name}</strong>
-            <span>${order.product_description}</span>
-          </div>
+          <div class="icon-box"><img src="/assets/Nova pasta/01_selo_seguranca_transparent.png" alt=""></div>
+          <div><strong>${esc(order.product_name)}</strong><span>${esc(order.product_description)}</span></div>
         </div>
 
-        <div id="categories-wrapper"></div>
+        <div id="categories-wrapper">${order.available_categories.map((cat, ci) => category_html(cat, ci)).join('')}</div>
 
         <div class="order-summary">
           <h2>Resumo do pedido</h2>
           <div id="summary-lines"></div>
-          <div class="order-summary-total">
-            <div><span>Total de peças</span><strong id="total-qty">0</strong></div>
-            <div class="right"><span>Valor total</span><strong class="yellow-text" id="total-price">R$ 0,00</strong></div>
-          </div>
         </div>
 
-        <button class="btn-confirm" id="btn-confirm" onclick="open_review()" disabled>CONFIRMAR PEDIDO</button>
-        <p class="secure-text">🔒 Você revisa o pedido mais uma vez antes de gerar o Pix.</p>
-      `;
+        <div class="sticky-bar">
+          <div class="sticky-info">
+            <span id="total-qty">0 peças</span>
+            <strong class="yellow-text" id="total-price">R$ 0,00</strong>
+          </div>
+          <button class="btn-confirm" id="btn-confirm" onclick="open_review()" disabled>Confirmar pedido</button>
+        </div>
+        <p class="secure-text">🔒 Você revisa o pedido mais uma vez antes de gerar o Pix.</p>`;
 
-      document.getElementById('app-content').innerHTML = html;
-
-      const catWrap = document.getElementById('categories-wrapper');
-      
-      order.available_categories.forEach((cat, index) => {
-        selection[cat.name] = cat.initial_sizes ? { ...cat.initial_sizes } : { 'Unico': 0 };
-        
-        const catDiv = document.createElement('div');
-        catDiv.className = 'category-block';
-        
-        if (cat.has_sizes) {
-          catDiv.innerHTML = `<h2 class="cat-title">${cat.name} <small>${brl(cat.price_cents)} cada</small></h2><div class="sizes-grid" id="grid-${index}"></div>`;
-          catWrap.appendChild(catDiv);
-          
-          const grid = catDiv.querySelector('.sizes-grid');
-          ['PP', 'P', 'M', 'G', 'GG', 'XG', 'XGG', 'G1', 'G2', 'G3', 'G4', 'G5'].forEach(size => {
-            const qty = selection[cat.name][size] || 0;
-            const item = document.createElement('div');
-            item.className = qty > 0 ? 'size-item active' : 'size-item';
-            item.id = `item-${index}-${size}`;
-            item.innerHTML = `
-              <span class="size-label">${size}</span>
-              <div class="counter">
-                <button onclick="attempt_change('${cat.name}', '${size}', -1, ${index})">−</button>
-                <span id="val-${index}-${size}">${qty}</span>
-                <button onclick="attempt_change('${cat.name}', '${size}', 1, ${index})">+</button>
-              </div>
-            `;
-            grid.appendChild(item);
-          });
-        } else {
-          const qty = selection[cat.name]['Unico'] || 0;
-          catDiv.innerHTML = `
-            <h2 class="cat-title">${cat.name}</h2>
-            <div class="size-item ${qty > 0 ? 'active' : ''}" id="item-${index}-Unico" style="width: 100%;">
-              <span class="size-label" style="font-size: 14px;">${cat.name} <br><small style="color:#facc15;">R$ ${(cat.price_cents/100).toFixed(2).replace('.', ',')} cada</small></span>
-              <div class="counter">
-                <button onclick="attempt_change('${cat.name}', 'Unico', -1, ${index})">−</button>
-                <span id="val-${index}-Unico">${qty}</span>
-                <button onclick="attempt_change('${cat.name}', 'Unico', 1, ${index})">+</button>
-              </div>
-            </div>
-          `;
-          catWrap.appendChild(catDiv);
-        }
-      });
-
-      if (img_count > 1) enable_drag_scroll(document.getElementById('carousel'));
+      document.querySelectorAll('.counter button').forEach(b => b.addEventListener('click', () => change(+b.dataset.ci, b.dataset.size, +b.dataset.d)));
+      if (photos.length > 1) setup_carousel();
       update_total();
     }
 
-    function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
-    function brl(cents) { return 'R$ ' + (cents / 100).toFixed(2).replace('.', ','); }
+    function counter_html(ci, size, qty) {
+      return `<div class="counter">
+        <button type="button" data-ci="${ci}" data-size="${size}" data-d="-1" aria-label="Diminuir">−</button>
+        <span id="val-${ci}-${size}">${qty}</span>
+        <button type="button" data-ci="${ci}" data-size="${size}" data-d="1" aria-label="Aumentar">+</button>
+      </div>`;
+    }
 
-    /* Linhas do resumo: uma por categoria com peças escolhidas */
+    function category_html(cat, ci) {
+      const sel = selection[cat.name];
+      const price = is_manual() ? '' : `<small>${brl(cat.price_cents)} cada</small>`;
+      if (!cat.has_sizes) {
+        const q = sel.Unico || 0;
+        return `<div class="category-block"><h2 class="cat-title">${esc(cat.name)} ${price}</h2>
+          <div class="size-item wide ${q ? 'active' : ''}" id="item-${ci}-Unico"><span class="size-label">Quantidade</span>${counter_html(ci, 'Unico', q)}</div></div>`;
+      }
+      return `<div class="category-block"><h2 class="cat-title">${esc(cat.name)} ${price}</h2>
+        <div class="sizes-grid">${SIZES.map(sz => {
+          const q = sel[sz] || 0;
+          return `<div class="size-item ${q ? 'active' : ''}" id="item-${ci}-${sz}"><span class="size-label">${sz}</span>${counter_html(ci, sz, q)}</div>`;
+        }).join('')}</div></div>`;
+    }
+
+    function change(ci, size, d) {
+      const cat = order.available_categories[ci];
+      const sel = selection[cat.name];
+      const q = Math.max(0, (sel[size] || 0) + d);
+      sel[size] = q;
+      $(`#val-${ci}-${size}`).textContent = q;
+      $(`#item-${ci}-${size}`).classList.toggle('active', q > 0);
+      update_total();
+    }
+
     function summary_rows() {
-      return orderData.available_categories.map(cat => {
+      return order.available_categories.map(cat => {
         const sizes = selection[cat.name] || {};
         const qty = Object.values(sizes).reduce((a, q) => a + q, 0);
-        const detail = Object.entries(sizes).filter(([_, q]) => q > 0)
-          .map(([sz, q]) => sz === 'Unico' ? `${q} un` : `${sz}: ${q}`).join(' · ');
+        const detail = Object.entries(sizes).filter(([, q]) => q > 0).map(([sz, q]) => sz === 'Unico' ? `${q} un` : `${sz}: ${q}`).join(' · ');
         return { name: cat.name, qty, detail, cents: cat.price_cents * qty };
       }).filter(r => r.qty > 0);
     }
 
+    // Pix manual: o valor é o combinado com a loja, não a soma das categorias.
+    const total_cents = (rows) => is_manual() ? order.total_cents : rows.reduce((a, r) => a + r.cents, 0);
+
     function rows_html(rows) {
       if (!rows.length) return '<p class="summary-empty">Nenhuma peça selecionada.</p>';
-      return rows.map(r => `
-        <div class="summary-line">
-          <div><strong>${esc(r.name)}</strong><span>${r.qty} ${r.qty === 1 ? 'peça' : 'peças'} — ${esc(r.detail)}</span></div>
-          <b>${brl(r.cents)}</b>
-        </div>`).join('');
+      return rows.map(r => `<div class="summary-line">
+        <div><strong>${esc(r.name)}</strong><span>${r.qty} ${r.qty === 1 ? 'peça' : 'peças'} — ${esc(r.detail)}</span></div>
+        ${is_manual() ? '' : `<b>${brl(r.cents)}</b>`}</div>`).join('');
     }
 
     function update_total() {
       const rows = summary_rows();
-      const totalQty = rows.reduce((a, r) => a + r.qty, 0);
-      const totalPriceCents = rows.reduce((a, r) => a + r.cents, 0);
-
-      document.getElementById('summary-lines').innerHTML = rows_html(rows);
-      document.getElementById('total-qty').textContent = totalQty;
-      document.getElementById('total-price').textContent = brl(totalPriceCents);
-
-      const btn = document.getElementById('btn-confirm');
-      if (totalQty > 0) { btn.disabled = false; btn.style.opacity = '1'; } else { btn.disabled = true; btn.style.opacity = '0.5'; }
+      const qty = rows.reduce((a, r) => a + r.qty, 0);
+      $('#summary-lines').innerHTML = rows_html(rows);
+      $('#total-qty').textContent = `${qty} ${qty === 1 ? 'peça' : 'peças'}`;
+      $('#total-price').textContent = brl(total_cents(rows));
+      $('#btn-confirm').disabled = qty === 0;
     }
 
-    function show_payment_screen(order) {
-      document.getElementById('status-banner').style.display = 'flex'; 
-      const total = (order.total_cents / 100).toFixed(2).replace('.', ',');
-      
-      // Se a PinguPag mandou a imagem base64, usa ela. Senão, gera pelo link.
-      let qr_src = order.qr_image;
-      if (!qr_src) {
-         qr_src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(order.payment_link)}`;
-      }
-
-      let items_html = '';
-      if(order.selected_sizes) {
-        order.selected_sizes.forEach(s => {
-          let qtds = Object.entries(s.sizes).filter(([_, q]) => q > 0).map(([sz, q]) => {
-            return sz === 'Unico' ? `${q} un` : `${q} un ${sz}`;
-          }).join(', ');
-          if (qtds) items_html += `<div class="order-item-line"><span>${s.category}</span><span class="yellow-text">${qtds}</span></div>`;
-        });
-      }
-
-      const html = `
-        <div class="card payment-card">
-          <div class="card-header-line">
-            <h2 style="font-size: 18px; margin:0; color:#fff;">Resumo do Pedido</h2>
-            <span style="font-size: 12px; color: #888;">Pedido #${order.id}</span>
-          </div>
-
-          <div class="product-row">
-            <div class="product-img">
-              ${order.photos && order.photos.length > 0 ? `<img src="${order.photos[0]}">` : '<div style="background:#222; width:100%; height:100%;"></div>'}
-            </div>
-            <div class="product-info">
-              <h3 style="font-size: 15px; margin-bottom: 5px; color:#fff;">${order.product_name}</h3>
-              <div class="order-items-container">${items_html}</div>
-            </div>
-          </div>
-
-          <div class="total-line">
-            <span>Total do Pedido</span>
-            <h2 class="yellow-text" style="font-size: 22px; margin:0;">R$ ${total}</h2>
-          </div>
-
-          <hr class="divider">
-          <div class="pix-container">
-            <div class="pix-top">
-              <div style="display:flex; align-items:center; gap:10px;">
-                <img src="/assets/Nova pasta/01_selo_seguranca_transparent.png" style="width: 35px;">
-                <div>
-                  <h3 style="font-size: 16px; margin:0; color:#fff;">Pagamento via PIX</h3>
-                  <p style="font-size: 11px; color: #888; margin:0;">Rápido, seguro e sem taxas.</p>
-                </div>
-              </div>
-            </div>
-
-            <div class="pix-content">
-              <div class="qr-box"><img src="${qr_src}"></div>
-              <div class="pix-instructions">
-                <p style="font-size: 13px; color: #ddd; line-height: 1.4; margin-bottom: 15px;">Escaneie o QR Code com o app do seu banco ou copie o código PIX abaixo.</p>
-                <div class="input-copy">
-                  <input type="text" id="pix-code" value="${order.payment_link}" readonly>
-                  <button onclick="copy_pix()">Copiar</button>
-                </div>
-              </div>
-            </div>
-            <button class="btn-copy-large" onclick="copy_pix()">COPIAR CÓDIGO PIX</button>
-          </div>
-
-          <div class="trust-badges-row">
-            <div class="trust-badge"><img src="/assets/Nova pasta/01_selo_seguranca_transparent.png"><span>Compra<br>Segura</span></div>
-            <div class="trust-badge"><img src="/assets/Nova pasta/02_pagamento_rapido_transparent.png"><span>Pagamento<br>Rápido</span></div>
-            <div class="trust-badge"><img src="/assets/Nova pasta/03_caixa_envio_transparent.png"><span>Produção<br>Ágil</span></div>
-            <div class="trust-badge"><img src="/assets/Nova pasta/04_suporte_atendimento_transparent.png"><span>Suporte<br>Especializado</span></div>
-          </div>
-
-          <div class="timeline-container">
-            <h4 style="font-size: 14px; margin-bottom: 20px; color:#fff;">Próximas Etapas</h4>
-            <div class="timeline-track">
-              <div class="timeline-line"></div>
-              <div class="timeline-step">
-                <div class="timeline-icon active"><img src="/assets/Nova pasta/05_etapa_pagamento_transparent.png"></div>
-                <span>Pagamento<br>Confirmado</span>
-              </div>
-              <div class="timeline-step">
-                <div class="timeline-icon"><img src="/assets/Nova pasta/06_etapa_producao_transparent.png"></div>
-                <span>Produção<br>(até 1 dia útil)</span>
-              </div>
-              <div class="timeline-step">
-                <div class="timeline-icon"><img src="/assets/Nova pasta/07_etapa_entrega_transparent.png"></div>
-                <span>Envio<br>(rastreio)</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-      document.getElementById('app-content').innerHTML = html;
+    function setup_carousel() {
+      const track = $('#carousel');
+      const dots = [...document.querySelectorAll('#dots i')];
+      track.addEventListener('scroll', () => {
+        const i = Math.round(track.scrollLeft / track.clientWidth);
+        dots.forEach((d, k) => d.classList.toggle('on', k === i));
+      }, { passive: true });
+      // Arrastar com o mouse no computador
+      let down = false, startX = 0, start = 0;
+      track.addEventListener('mousedown', e => { down = true; startX = e.pageX; start = track.scrollLeft; track.style.scrollSnapType = 'none'; });
+      window.addEventListener('mouseup', () => { if (!down) return; down = false; track.style.scrollSnapType = ''; });
+      track.addEventListener('mousemove', e => { if (down) { e.preventDefault(); track.scrollLeft = start - (e.pageX - startX); } });
     }
 
-    function copy_pix() { const txt = document.getElementById('pix-code'); txt.select(); document.execCommand('copy'); alert('Código PIX copiado com sucesso!'); }
-    function enable_drag_scroll(slider) { let isDown = false; let startX; let scrollLeft; slider.addEventListener('mousedown', (e) => { isDown = true; slider.style.cursor = 'grabbing'; startX = e.pageX - slider.offsetLeft; scrollLeft = slider.scrollLeft; }); slider.addEventListener('mouseleave', () => { isDown = false; slider.style.cursor = 'grab'; }); slider.addEventListener('mouseup', () => { isDown = false; slider.style.cursor = 'grab'; }); slider.addEventListener('mousemove', (e) => { if (!isDown) return; e.preventDefault(); const x = e.pageX - slider.offsetLeft; const walk = (x - startX) * 2; slider.scrollLeft = scrollLeft - walk; }); }
-
-    function attempt_change(cat, size, delta, catIndex) {
-      if (delta < 0 && selection[cat][size] === 0) return; 
-      if (!modalShown) {
-        pendingChange = { cat, size, delta, catIndex };
-        document.getElementById('modal-alter').style.display = 'flex';
-      } else {
-        apply_change(cat, size, delta, catIndex);
-      }
-    }
-
-    function confirm_alter() {
-      if (pendingChange) apply_change(pendingChange.cat, pendingChange.size, pendingChange.delta, pendingChange.catIndex);
-      modalShown = true; close_alter_modal();
-    }
-
-    function close_alter_modal() {
-      document.getElementById('modal-alter').style.display = 'none';
-      pendingChange = null;
-    }
-
-    function apply_change(cat, size, delta, catIndex) {
-      selection[cat][size] += delta;
-      document.getElementById(`val-${catIndex}-${size}`).textContent = selection[cat][size];
-      const parent = document.getElementById(`item-${catIndex}-${size}`);
-      if (selection[cat][size] > 0) parent.classList.add('active'); else parent.classList.remove('active');
-      update_total();
-    }
-
-    /* Revisão final antes de gerar o Pix */
+    /* ---------- Revisão e envio ---------- */
     function open_review() {
       const rows = summary_rows();
       if (!rows.length) return;
-      const total = rows.reduce((a, r) => a + r.cents, 0);
-      document.getElementById('review-lines').innerHTML = rows_html(rows);
-      document.getElementById('review-total').textContent = brl(total);
-      document.getElementById('modal-review').style.display = 'flex';
+      $('#review-lines').innerHTML = rows_html(rows);
+      $('#review-total').textContent = brl(total_cents(rows));
+      $('#review-text').textContent = 'Revise os itens abaixo. Depois de confirmar, mostramos o Pix para pagamento.';
+      $('#review-ok').textContent = 'Confirmar e ver o Pix';
+      $('#modal-review').style.display = 'flex';
+    }
+    function close_review() { $('#modal-review').style.display = 'none'; }
+
+    async function submit_order() {
+      const btn = $('#review-ok');
+      btn.disabled = true; btn.textContent = 'Gerando Pix...';
+      const payload = { selected_sizes: Object.keys(selection).map(cat => ({ category: cat, sizes: selection[cat] })) };
+      const url = is_manual() ? `/api/manual-orders/${id}/confirm` : `/api/orders/${id}/checkout`;
+      try {
+        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json.error || 'Não foi possível gerar o Pix.');
+        close_review();
+        order = await fetch_order();
+        route();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (err) {
+        alert(err.message + '\n\nSe o problema continuar, fale com a gente pelo WhatsApp.');
+      }
+      btn.disabled = false; btn.textContent = 'Confirmar e ver o Pix';
     }
 
-    function close_review() { document.getElementById('modal-review').style.display = 'none'; }
+    /* ---------- 2. Pagamento ---------- */
+    function qr_src() {
+      const q = order.qr_image;
+      if (q) return /^(data:|\/|https?:)/.test(q) ? q : `data:image/png;base64,${q}`;
+      return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(order.payment_link || '')}`;
+    }
 
-    function confirm_review() { close_review(); open_confirm_modal(); }
+    function items_html() {
+      return (order.selected_sizes || []).map(s => {
+        const q = Object.entries(s.sizes || {}).filter(([, n]) => n > 0).map(([sz, n]) => sz === 'Unico' ? `${n} un` : `${n} ${sz}`).join(', ');
+        return q ? `<div class="order-item-line"><span>${esc(s.category)}</span><span class="yellow-text">${esc(q)}</span></div>` : '';
+      }).join('');
+    }
 
-    async function open_confirm_modal() {
-      const btn = document.getElementById('btn-confirm');
-      btn.textContent = 'GERANDO PIX...';
-      btn.disabled = true;
+    function show_payment() {
+      const manual = is_manual();
+      $('#app-content').innerHTML = `
+        <ol class="steps">
+          <li class="done"><b>✓</b>Confirmação</li>
+          <li class="active"><b>2</b>Pagamento</li>
+          <li><b>3</b>Produção</li>
+        </ol>
 
-      const payload = {
-        selected_sizes: Object.keys(selection).map(cat => ({ category: cat, sizes: selection[cat] }))
-      };
+        <div class="card payment-card">
+          <div class="pay-total">
+            <span>Total a pagar</span>
+            <strong class="yellow-text">${brl(order.total_cents)}</strong>
+            ${manual ? `<div class="timer" id="timer">--:--</div>` : ''}
+          </div>
 
-      try {
-        const res = await fetch(`/api/orders/${id}/checkout`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+          <div class="pix-steps">
+            <div><b>1</b><span>Toque em <strong>Copiar código Pix</strong></span></div>
+            <div><b>2</b><span>Abra o app do seu banco e escolha <strong>Pix copia e cola</strong></span></div>
+            <div><b>3</b><span>Cole o código e confirme. Esta página atualiza sozinha.</span></div>
+          </div>
 
-        if (res.ok) { 
-          location.reload(); 
-        } else {
-          const errJson = await res.json().catch(() => ({}));
-          btn.textContent = 'CONFIRMAR PEDIDO';
-          btn.disabled = false;
-          alert('Erro: ' + (errJson.error || 'Verifique o painel.'));
+          <button class="btn-copy-large" id="btn-copy" onclick="copy_pix()">Copiar código Pix</button>
+
+          <div class="input-copy">
+            <input type="text" id="pix-code" value="${esc(order.payment_link || '')}" readonly onclick="this.select()">
+          </div>
+
+          <details class="qr-details" ${matchMedia('(min-width: 700px)').matches ? 'open' : ''}>
+            <summary>Pagar com QR Code (de outro aparelho)</summary>
+            <div class="qr-box"><img src="${esc(qr_src())}" alt="QR Code do Pix"></div>
+          </details>
+
+          <p class="checking"><i class="live-dot"></i> Aguardando a confirmação do pagamento...</p>
+
+          <hr class="divider">
+
+          <div class="product-row">
+            <div class="product-img">${(order.photos || [])[0] ? `<img src="${esc(order.photos[0])}" alt="">` : ''}</div>
+            <div class="product-info">
+              <h3>${esc(order.product_name)}</h3>
+              <div class="order-items-container">${items_html()}</div>
+            </div>
+          </div>
+          <span class="muted small">Pedido #${esc(order.id.slice(0, 6).toUpperCase())}</span>
+        </div>
+
+        <div class="trust-badges-row">
+          <div class="trust-badge"><img src="/assets/Nova pasta/01_selo_seguranca_transparent.png" alt=""><span>Compra<br>segura</span></div>
+          <div class="trust-badge"><img src="/assets/Nova pasta/02_pagamento_rapido_transparent.png" alt=""><span>Pagamento<br>rápido</span></div>
+          <div class="trust-badge"><img src="/assets/Nova pasta/03_caixa_envio_transparent.png" alt=""><span>Produção<br>ágil</span></div>
+          <div class="trust-badge"><img src="/assets/Nova pasta/04_suporte_atendimento_transparent.png" alt=""><span>Suporte<br>especializado</span></div>
+        </div>
+        ${timeline_html(false)}`;
+      if (manual && order.expires_at) start_timer(new Date(order.expires_at).getTime());
+    }
+
+    function timeline_html(paid) {
+      return `<div class="timeline-container card">
+        <h4>Próximas etapas</h4>
+        <div class="timeline-track">
+          <div class="timeline-line"></div>
+          <div class="timeline-step"><div class="timeline-icon ${paid ? 'active' : ''}"><img src="/assets/Nova pasta/05_etapa_pagamento_transparent.png" alt=""></div><span>Pagamento<br>confirmado</span></div>
+          <div class="timeline-step"><div class="timeline-icon"><img src="/assets/Nova pasta/06_etapa_producao_transparent.png" alt=""></div><span>Produção<br>(até 1 dia útil)</span></div>
+          <div class="timeline-step"><div class="timeline-icon"><img src="/assets/Nova pasta/07_etapa_entrega_transparent.png" alt=""></div><span>Envio<br>(rastreio)</span></div>
+        </div>
+      </div>`;
+    }
+
+    async function copy_pix() {
+      const code = order.payment_link || '';
+      if (!code) return;
+      try { await navigator.clipboard.writeText(code); }
+      catch { const i = $('#pix-code'); i.select(); document.execCommand('copy'); }
+      const btn = $('#btn-copy');
+      btn.textContent = '✓ Código copiado'; btn.classList.add('copied');
+      toast('Código Pix copiado! Agora cole no app do banco.');
+      setTimeout(() => { btn.textContent = 'Copiar código Pix'; btn.classList.remove('copied'); }, 3000);
+    }
+
+    function start_timer(expires_at) {
+      clearInterval(timer);
+      const el = $('#timer');
+      const tick = () => {
+        const left = expires_at - Date.now();
+        if (left <= 0) {
+          clearInterval(timer);
+          el.textContent = 'Prazo encerrado'; el.classList.add('expired');
+          set_support(`Olá! O prazo do Pix do pedido #${order.id.slice(0, 6).toUpperCase()} acabou. Já paguei / preciso de um novo Pix.`);
+          return;
         }
-      } catch (err) {
-        btn.textContent = 'CONFIRMAR PEDIDO';
-        btn.disabled = false;
-        alert('Erro de conexão.'); 
-      }
+        const m = Math.floor(left / 60000), s = Math.floor(left / 1000) % 60;
+        el.textContent = `Pague em ${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        el.classList.toggle('urgent', left < 60000);
+      };
+      tick(); timer = setInterval(tick, 1000);
+    }
+
+    // Confere o pagamento a cada 5 segundos enquanto a página estiver aberta
+    function start_poll() {
+      poll = setInterval(async () => {
+        if (document.hidden) return;
+        try {
+          const fresh = await fetch_order();
+          if (fresh.status !== order.status) { order = fresh; clearInterval(timer); route(); }
+        } catch {}
+      }, 5000);
+    }
+    function stop_poll() { clearInterval(poll); poll = null; }
+    document.addEventListener('visibilitychange', async () => {
+      if (document.hidden || !order || order.status !== 'pending') return;
+      try { const fresh = await fetch_order(); if (fresh.status !== order.status) { order = fresh; clearInterval(timer); route(); } } catch {}
+    });
+
+    /* ---------- 3. Pago / recusado ---------- */
+    function show_paid() {
+      clearInterval(timer);
+      set_support(`Olá! Paguei o pedido #${order.id.slice(0, 6).toUpperCase()} e quero acompanhar a produção.`);
+      $('#app-content').innerHTML = `
+        <ol class="steps">
+          <li class="done"><b>✓</b>Confirmação</li>
+          <li class="done"><b>✓</b>Pagamento</li>
+          <li class="active"><b>3</b>Produção</li>
+        </ol>
+        <div class="card state-card paid">
+          <div class="check">✓</div>
+          <h2 class="yellow-text">Pagamento confirmado!</h2>
+          <p>${order.first_name ? esc(order.first_name) + ', seu' : 'Seu'} pedido já foi para a produção. Avisamos pelo WhatsApp quando for enviado.</p>
+          <div class="order-items-container">${items_html()}</div>
+          <p class="muted small">Pedido #${esc(order.id.slice(0, 6).toUpperCase())} · ${brl(order.total_cents)}</p>
+        </div>
+        ${timeline_html(true)}`;
+    }
+
+    function show_rejected() {
+      $('#app-content').innerHTML = `
+        <div class="card state-card">
+          <h2>Pagamento não aprovado</h2>
+          <p>Não recebemos a confirmação deste pagamento. Fale com a gente pelo WhatsApp que resolvemos rapidinho.</p>
+        </div>`;
     }
 
     init();
