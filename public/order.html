@@ -276,37 +276,7 @@
           </div>
 
           <hr class="divider">
-          <div class="pay-tabs" role="tablist">
-            <button type="button" class="pay-tab active" data-tab="pix" onclick="switch_pay_tab('pix')">Pix</button>
-            <button type="button" class="pay-tab" data-tab="card" onclick="switch_pay_tab('card')">Cartão de crédito</button>
-          </div>
-
-          <div class="card-container" id="pay-card" style="display:none">
-            <form id="card-form" onsubmit="submit_card(event)" novalidate autocomplete="on">
-              <label class="card-field">Número do cartão
-                <input id="cc-number" inputmode="numeric" autocomplete="cc-number" placeholder="0000 0000 0000 0000" maxlength="23" oninput="mask_card_number(this)">
-              </label>
-              <label class="card-field">Nome impresso no cartão
-                <input id="cc-name" autocomplete="cc-name" placeholder="Como está no cartão" oninput="this.value = this.value.toUpperCase()">
-              </label>
-              <div class="card-row">
-                <label class="card-field">Validade
-                  <input id="cc-exp" inputmode="numeric" autocomplete="cc-exp" placeholder="MM/AA" maxlength="5" oninput="mask_card_exp(this)">
-                </label>
-                <label class="card-field">CVV
-                  <input id="cc-cvv" inputmode="numeric" autocomplete="cc-csc" placeholder="123" maxlength="4" oninput="this.value = this.value.replace(/\\D/g, '')">
-                </label>
-              </div>
-              <label class="card-field">Parcelas
-                <select id="cc-installments">${installment_options(order.total_cents)}</select>
-              </label>
-              <p class="card-error" id="card-error"></p>
-              <button type="submit" class="btn-copy-large">PAGAR COM CARTÃO</button>
-              <p class="card-note" id="card-note"></p>
-            </form>
-          </div>
-
-          <div class="pix-container" id="pay-pix">
+          <div class="pix-container">
             <div class="pix-top">
               <div style="display:flex; align-items:center; gap:10px;">
                 <img src="/assets/Nova pasta/01_selo_seguranca_transparent.png" style="width: 35px;">
@@ -358,70 +328,6 @@
         </div>
       `;
       document.getElementById('app-content').innerHTML = html;
-    }
-
-    /* ---------- Cartão de crédito (por enquanto só formulário) ----------
-       Os dados do cartão ficam só no navegador: nada é enviado ao servidor
-       nem salvo. Para cobrar de verdade, ligar aqui a uma operadora
-       (gateway) que gere um token do cartão. */
-    function switch_pay_tab(tab) {
-      document.querySelectorAll('.pay-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-      document.getElementById('pay-pix').style.display = tab === 'pix' ? 'block' : 'none';
-      document.getElementById('pay-card').style.display = tab === 'card' ? 'block' : 'none';
-    }
-
-    function installment_options(total_cents) {
-      let opts = '';
-      for (let n = 1; n <= 12; n++) {
-        opts += `<option value="${n}">${n}x de ${brl(Math.ceil(total_cents / n))}${n === 1 ? ' (à vista)' : ''}</option>`;
-      }
-      return opts;
-    }
-
-    function mask_card_number(el) {
-      el.value = el.value.replace(/\D/g, '').slice(0, 19).replace(/(\d{4})(?=\d)/g, '$1 ');
-    }
-
-    function mask_card_exp(el) {
-      const d = el.value.replace(/\D/g, '').slice(0, 4);
-      el.value = d.length > 2 ? d.slice(0, 2) + '/' + d.slice(2) : d;
-    }
-
-    function luhn_ok(num) {
-      let sum = 0, dbl = false;
-      for (let i = num.length - 1; i >= 0; i--) {
-        let d = +num[i];
-        if (dbl) { d *= 2; if (d > 9) d -= 9; }
-        sum += d; dbl = !dbl;
-      }
-      return sum % 10 === 0;
-    }
-
-    function submit_card(e) {
-      e.preventDefault();
-      const err = document.getElementById('card-error');
-      const note = document.getElementById('card-note');
-      const number = document.getElementById('cc-number').value.replace(/\D/g, '');
-      const name = document.getElementById('cc-name').value.trim();
-      const exp = document.getElementById('cc-exp').value;
-      const cvv = document.getElementById('cc-cvv').value;
-      note.textContent = '';
-
-      let msg = '';
-      const [mm, aa] = exp.split('/').map(Number);
-      const now = new Date();
-      const expired = !aa || (2000 + aa < now.getFullYear()) || (2000 + aa === now.getFullYear() && mm < now.getMonth() + 1);
-      if (number.length < 13 || !luhn_ok(number)) msg = 'Confira o número do cartão.';
-      else if (name.split(' ').length < 2) msg = 'Informe o nome como está impresso no cartão.';
-      else if (!mm || mm > 12 || expired) msg = 'Confira a validade do cartão.';
-      else if (cvv.length < 3) msg = 'Confira o código de segurança (CVV).';
-      err.textContent = msg;
-      if (msg) return;
-
-      // Não envia nada: limpa os dados sensíveis e avisa o cliente.
-      document.getElementById('cc-number').value = '';
-      document.getElementById('cc-cvv').value = '';
-      note.innerHTML = 'O pagamento com cartão ainda não está disponível. Para concluir agora, use o <strong>Pix</strong> ou fale com nossa equipe.';
     }
 
     function copy_pix() { const txt = document.getElementById('pix-code'); txt.select(); document.execCommand('copy'); alert('Código PIX copiado com sucesso!'); }
