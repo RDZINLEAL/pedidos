@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BRAVUS Brasil — Estilo Agro, Pesca e Country</title>
+  <meta name="description" content="Camisas, bonés, botas, chapéus e fivelas para quem vive o agro, a pesca e o country. Monte seu kit e personalize com a sua identidade.">
+  <meta name="theme-color" content="#0d0d0d">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,800;1,800;1,900&family=Inter:wght@400;500;600;700;800&family=Kaushan+Script&family=Rye&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/estilo.css">
+  <link rel="stylesheet" href="css/interativo.css">
+  <link rel="stylesheet" href="css/pagamento.css">
+  <link rel="icon" href="img/marca/logo.jpg">
+</head>
+<body>
+  <div class="aviso-topo">🚚 Frete grátis acima de R$ 250 · 🔥 <a href="#/kit">Kit 4 camisas por R$ 99,89</a> · ✨ <a href="#/personalizar">Personalize com seu nome</a></div>
+
+  <header class="topo">
+    <div class="topo-in">
+      <button id="btn-menu" class="icone so-mobile" aria-label="Abrir menu">
+        <svg viewBox="0 0 24 24" width="24" height="24"><path d="M3 7h18M3 12h18M3 17h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <a href="#/" class="logo" aria-label="BRAVUS Brasil — Início"><img src="img/marca/logo.jpg" alt="BRAVUS Brasil"></a>
+      <nav class="menu" aria-label="Principal">
+        <a href="#/">Início</a>
+        <a href="#/loja?cat=camisas">Camisas</a>
+        <a href="#/loja?cat=bones">Bonés</a>
+        <a href="#/loja?cat=botas-chapeus">Botas & Chapéus</a>
+        <a href="#/loja?cat=fivelas">Fivelas</a>
+        <a href="#/kit" class="menu-destaque">Monte seu kit</a>
+        <a href="#/personalizar" class="menu-destaque">Personalize</a>
+        <a href="#/sobre">Sobre</a>
+        <a href="#/contato">Contato</a>
+      </nav>
+      <div class="topo-acoes">
+        <form id="form-busca" class="busca" role="search" autocomplete="off">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
+          <label class="sr" for="busca">Buscar produtos</label>
+          <input id="busca" type="search" placeholder="Busque: tucunaré, boné, fivela…">
+          <div id="busca-res" class="busca-res"></div>
+        </form>
+        <a href="#/favoritos" class="icone favs" aria-label="Favoritos">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/></svg>
+          <span id="fav-contador" class="contador" hidden>0</span>
+        </a>
+        <a href="#/sacola" class="icone sacola" aria-label="Abrir sacola" data-abrir-sacola>
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+          <span id="contador" class="contador" hidden>0</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main id="app" tabindex="-1"></main>
+
+  <footer class="rodape">
+    <div class="rodape-grade">
+      <div class="rodape-marca">
+        <img src="img/marca/logo.jpg" alt="BRAVUS Brasil">
+        <p>Mais que um estilo, um jeito de viver o agro, a pesca e o country. Qualidade, conforto e personalização para quem vive essa paixão.</p>
+      </div>
+      <div>
+        <h4>Categorias</h4>
+        <a href="#/loja?cat=camisas">Camisas</a>
+        <a href="#/loja?cat=bones">Bonés</a>
+        <a href="#/loja?cat=botas-chapeus">Botas & Chapéus</a>
+        <a href="#/loja?cat=fivelas">Fivelas</a>
+        <a href="#/loja?cat=personalizados">Personalizados</a>
+      </div>
+      <div>
+        <h4>Ferramentas</h4>
+        <a href="#/kit">Montador de kit</a>
+        <a href="#/personalizar">Simulador de personalização</a>
+        <a href="#/favoritos">Meus favoritos</a>
+        <a href="#/sobre">Sobre nós</a>
+        <a href="#/contato">Contato, trocas e LGPD</a>
+      </div>
+      <div>
+        <h4>Onde estamos</h4>
+        <p>Rua Santa Rosa, 254 — Glória<br>Vila Velha/ES · CEP 29122-290</p>
+        <a data-wpp href="#" target="_blank" rel="noopener" class="link-wpp">WhatsApp →</a>
+      </div>
+    </div>
+    <div class="rodape-base">
+      <span>© <span id="ano"></span> BRAVUS Brasil. Todos os direitos reservados.</span>
+      <span>CNPJ 00.000.000/0001-00</span>
+    </div>
+  </footer>
+
+  <!-- Sacola lateral -->
+  <div class="veu" data-fechar></div>
+  <aside id="gaveta" class="gaveta" aria-hidden="true" aria-label="Sacola">
+    <div class="gaveta-topo">
+      <h2>Sua sacola <span id="gaveta-qtd"></span></h2>
+      <button class="fechar" data-fechar aria-label="Fechar sacola">×</button>
+    </div>
+    <div id="gaveta-corpo" class="gaveta-corpo"></div>
+    <div id="gaveta-pe" class="gaveta-pe"></div>
+  </aside>
+
+  <!-- Espiar produto -->
+  <div id="modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Detalhes do produto">
+    <div class="modal-fundo" data-fechar></div>
+    <div class="modal-caixa">
+      <button class="fechar" data-fechar aria-label="Fechar">×</button>
+      <div id="modal-corpo"></div>
+    </div>
+  </div>
+
+  <a data-wpp href="#" class="wpp-flutuante" target="_blank" rel="noopener" aria-label="Falar no WhatsApp">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.5 14.4c-.3-.2-1.9-.9-2.2-1-.3-.1-.5-.2-.7.2s-.8 1-1 1.2c-.2.2-.4.2-.7.1-.3-.2-1.3-.5-2.5-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.5-.6.3-.5c.1-.2 0-.4 0-.5l-.9-2.3c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1.1 1-1.1 2.5s1.1 2.9 1.2 3.1c.2.2 2.2 3.4 5.4 4.7.8.3 1.4.5 1.8.6.8.3 1.5.2 2.1.1.6-.1 1.9-.8 2.2-1.5.3-.8.3-1.4.2-1.5-.1-.2-.3-.2-.6-.4zM12 2C6.5 2 2 6.5 2 12c0 1.8.5 3.5 1.3 4.9L2 22l5.3-1.3c1.4.8 3 1.3 4.7 1.3 5.5 0 10-4.5 10-10S17.5 2 12 2z"/></svg>
+  </a>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="js/produtos.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/pagamento.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

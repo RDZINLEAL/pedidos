@@ -33,6 +33,13 @@ const OrderSchema = new mongoose.Schema({
 
   total_cents: Number,
   coupon: String,          // 'caixa' ou 'sicredi' (promoção de parcerias)
+  // Pedidos da loja (kind 'loja')
+  items: Array,            // produtos com preço, quantidade e opções
+  address: String,
+  notes: String,
+  shipping_cents: Number,
+  store_coupon: String,    // cupom da loja, ex.: BRAVUS10
+  payment_method: String,  // 'pix' ou 'whatsapp'
   subtotal_cents: Number,  // total antes do desconto
   discount_cents: Number,
   created_at: { type: Date, default: Date.now },

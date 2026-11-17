@@ -117,6 +117,7 @@
       $('#status-banner').style.display = order.status === 'pending' ? 'flex' : 'none';
       if (order.status === 'paid') return show_paid();
       if (order.status === 'rejected') return show_rejected();
+      if (order.status === 'pending' && order.payment_method === 'whatsapp') return show_whatsapp();
       if (order.status === 'pending') { show_payment(); start_poll(); return; }
       show_selection();
     }
@@ -385,7 +386,7 @@
             <span>Total a pagar</span>
             ${order.discount_cents ? `<s class="old-price">${brl(order.subtotal_cents)}</s>` : ''}
             <strong class="yellow-text">${brl(order.total_cents)}</strong>
-            ${order.discount_cents ? `<span class="coupon-tag">Cupom ${esc(order.coupon_bank)} · −${brl(order.discount_cents)}</span>` : ''}
+            ${order.coupon ? `<span class="coupon-tag">Cupom ${esc(order.coupon_bank)} aplicado</span>` : ''}
             ${manual ? `<div class="timer" id="timer">--:--</div>` : ''}
           </div>
 
@@ -507,6 +508,18 @@
           <p class="muted small">Pedido #${esc(order.id.slice(0, 6).toUpperCase())} · ${brl(order.total_cents)}</p>
         </div>
         ${timeline_html(true)}`;
+    }
+
+    // Pedido da loja fechado pelo WhatsApp: o pagamento é combinado na conversa
+    function show_whatsapp() {
+      $('#status-banner').style.display = 'none';
+      $('#app-content').innerHTML = `
+        <div class="card state-card">
+          <h2>Pedido recebido!</h2>
+          <p>${order.first_name ? esc(order.first_name) + ', seu' : 'Seu'} pedido #${esc(order.id.slice(0, 6).toUpperCase())} está com a nossa equipe. O pagamento é combinado pelo WhatsApp.</p>
+          <div class="order-items-container">${items_html()}</div>
+          <p class="muted small">Total: ${brl(order.total_cents)}</p>
+        </div>`;
     }
 
     function show_rejected() {

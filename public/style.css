@@ -303,6 +303,7 @@ body.dark-theme {
 .act-wa { color: #4ade80; }
 .act-del { color: #f87171; margin-left: auto; }
 .act-del:hover { background: rgba(239,68,68,.15); color: #fca5a5; }
+.kind-loja { color: #facc15; border-color: rgba(250,204,21,.5); }
 .coupon-admin { color: #4ade80; border-color: rgba(34,197,94,.5); }
 .status-rejected { background: #fecaca; color: #991b1b; }
 .o-details { grid-column: 1 / -1; font-size: 13px; }

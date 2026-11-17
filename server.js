@@ -9,8 +9,10 @@ import path from 'path';
 import fs from 'fs';
 import { create_order, get_orders, get_order, update_order, delete_order, delete_all_orders } from './db.js';
 import { create_transaction } from './pingupag.js';
+import { calcular_loja } from './loja.js';
 
 const app = express();
+app.set('trust proxy', 1); // na hospedagem, o IP real do cliente vem do proxy
 const port = Number(process.env.PORT || 3000);
 const base = process.env.PUBLIC_BASE_URL || `http://localhost:${port}`;
 
@@ -63,6 +65,7 @@ function public_order(o) {
     discount_cents: o.discount_cents || 0,
     // A promoção só vale para o Pix automático: o Pix manual já tem o valor fixo no QR do banco.
     promo: PROMO.active && order_kind(o) === 'auto' ? PROMO : null,
+    payment_method: o.payment_method || null,
     payment_link: show_pix ? o.payment_link : null,
     qr_image: show_pix ? o.qr_image : null,
     expires_at: o.expires_at || null,
@@ -320,6 +323,89 @@ app.post('/api/manual-orders/:id/confirm', wrap(async (req, res) => {
   res.json({ success: true });
 }));
 
+/* ---------- Loja (página inicial) ---------- */
+
+app.get('/api/promo', (_req, res) => res.json({ promo: PROMO.active ? PROMO : null }));
+
+// Limite simples para ninguém disparar dezenas de Pix seguidos
+const hits = new Map();
+function rate_ok(ip, max = 8, win = 10 * 60 * 1000) {
+  const now = Date.now();
+  const list = (hits.get(ip) || []).filter(t => now - t < win);
+  if (list.length >= max) return false;
+  list.push(now); hits.set(ip, list);
+  if (hits.size > 5000) hits.clear();
+  return true;
+}
+
+function cpf_ok(cpf) {
+  if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
+  for (const n of [9, 10]) {
+    let s = 0;
+    for (let i = 0; i < n; i++) s += +cpf[i] * (n + 1 - i);
+    if ((s * 10) % 11 % 10 !== +cpf[n]) return false;
+  }
+  return true;
+}
+
+app.post('/api/loja/pedidos', wrap(async (req, res) => {
+  if (!rate_ok(req.ip)) return res.status(429).json({ error: 'Muitos pedidos seguidos. Espere alguns minutos ou fale com a gente no WhatsApp.' });
+  const b = req.body || {};
+  const c = b.cliente || {};
+  const forma = b.forma === 'whatsapp' ? 'whatsapp' : 'pix';
+  const t = (v, max = 120) => String(v ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, max);
+
+  const nome = t(c.nome), email = t(c.email), uf = t(c.uf, 2).toUpperCase();
+  const cpf = String(c.cpf || '').replace(/\D/g, ''), tel = String(c.tel || '').replace(/\D/g, '');
+  const cep = t(c.cep, 9), rua = t(c.rua), numero = t(c.numero, 20), comp = t(c.comp, 60), bairro = t(c.bairro, 80), cidade = t(c.cidade, 80);
+  if (!nome || !rua || !numero || !bairro || !cidade || !cep) return res.status(400).json({ error: 'Preencha seus dados e o endereço de entrega.' });
+  if (!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ error: 'E-mail inválido.' });
+  if (tel.length < 10 || tel.length > 13) return res.status(400).json({ error: 'WhatsApp inválido. Use DDD + número.' });
+  if (!cpf_ok(cpf)) return res.status(400).json({ error: 'CPF inválido.' });
+  if (c.lgpd !== true) return res.status(400).json({ error: 'É preciso aceitar o uso dos dados (LGPD).' });
+
+  const calc = calcular_loja({ itens: b.itens, cupom: b.cupom, uf, banco: forma === 'pix' ? b.banco : null }, PROMO.active ? PROMO : null);
+  const discount_cents = calc.desc_kit_cents + calc.desc_cupom_cents + calc.desc_banco_cents;
+  const pecas = calc.linhas.reduce((s, l) => s + l.qtd, 0);
+  const id = new_id();
+
+  const order = {
+    id, kind: 'loja', payment_method: forma, status: 'pending',
+    client_name: nome, client_email: email, client_document: cpf, client_phone: tel,
+    address: `${rua}, ${numero}${comp ? ' – ' + comp : ''} · ${bairro}, ${cidade}/${uf} · CEP ${cep}`,
+    notes: t(c.obs, 1000),
+    photos: [...new Set(calc.linhas.map(l => l.foto))].slice(0, 15),
+    product_name: `Pedido da loja (${pecas} ${pecas === 1 ? 'peça' : 'peças'})`,
+    product_description: calc.kits.join(' + '),
+    available_categories: [],
+    items: calc.linhas,
+    // Mesmo formato dos pedidos do painel, para a página do cliente mostrar os itens
+    selected_sizes: calc.linhas.map(l => {
+      const op = Object.values(l.opcoes).filter(Boolean).join(' · ');
+      return { category: l.nome + (op ? ` (${op})` : ''), sizes: { Unico: l.qtd } };
+    }),
+    shipping_cents: calc.frete_cents,
+    subtotal_cents: calc.total_cents + discount_cents, // valor sem descontos (com frete)
+    discount_cents,
+    coupon: calc.banco,
+    store_coupon: calc.cupom,
+    total_cents: calc.total_cents
+  };
+
+  if (forma === 'pix') {
+    let tx;
+    try {
+      tx = await create_transaction({ ...order, postback_url: `${base}/api/webhook/pingupag?sig=${sign(id)}` }, base);
+    } catch (err) {
+      console.error('[Loja] Falha ao gerar Pix:', err.message);
+      return res.status(502).json({ error: 'Não conseguimos gerar o Pix agora. Tente de novo em instantes ou feche o pedido pelo WhatsApp.' });
+    }
+    Object.assign(order, { payment_link: tx.payment_link, qr_image: tx.qr_image, mp_payment_id: tx.transaction_id });
+  }
+  await create_order(order);
+  res.json({ id, total_cents: order.total_cents });
+}));
+
 /* ---------- Aviso de pagamento da PinguPag ---------- */
 
 app.post('/api/webhook/pingupag', async (req, res) => {
@@ -357,7 +443,7 @@ app.get(['/pagamentoseguro', '/pagamentomanual'], (_req, res) => res.sendFile(pa
 
 // Erros: devolve uma mensagem legível em vez de travar
 app.use((err, _req, res, _next) => {
-  const status = err instanceof multer.MulterError || /inválid|Adicione|precisa/i.test(err.message) ? 400 : 500;
+  const status = err.status || err instanceof multer.MulterError || /inválid|Adicione|precisa/i.test(err.message) ? 400 : 500;
   if (status === 500) console.error(err);
   res.status(status).json({ error: err.message || 'Erro inesperado.' });
 });

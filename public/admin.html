@@ -37,6 +37,11 @@
         <option value="paid">Pago</option>
         <option value="rejected">Recusado</option>
       </select>
+      <select id="f-origin">
+        <option value="">Loja e painel</option>
+        <option value="loja">Só da loja</option>
+        <option value="painel">Só do painel</option>
+      </select>
       <select id="f-period">
         <option value="">Todo o período</option>
         <option value="today">Hoje</option>
@@ -188,12 +193,12 @@
           <label class="input-group edit-manual">Valor total (R$)<input name="amount_reais" inputmode="decimal"></label>
         </div>
         <label class="input-group edit-manual">Pix copia e cola<textarea name="payment_link" rows="2"></textarea></label>
-        <div class="section-title">
+        <div class="section-title edit-cats">
           <h3 class="form-section">Categorias</h3>
           <button type="button" onclick="add_category('edit-categories')" class="btn-secondary">+ Categoria</button>
         </div>
         <p class="hint" id="edit-note"></p>
-        <div id="edit-categories" class="categories-list"></div>
+        <div id="edit-categories" class="categories-list edit-cats"></div>
         <p class="form-error" id="edit-error"></p>
         <div class="modal-btns">
           <button type="button" class="btn-cancel" onclick="close_modal('modal-edit')">Cancelar</button>
@@ -226,6 +231,7 @@
       rejected: { label: 'Recusado', cls: 'status-rejected' }
     };
     const COUPONS = { caixa: 'Caixa / Caixa Tem', sicredi: 'Sicredi' };
+    const kind_label = (o) => o.kind === 'loja' ? `Loja · ${o.payment_method === 'whatsapp' ? 'WhatsApp' : 'Pix'}` : o.kind === 'manual' ? 'Pix manual' : 'Pix automático';
     let orders = [];
     let editing = null;
 
@@ -448,11 +454,13 @@
       const qd = q.replace(/\D/g, '');
       const st = $('#f-status').value;
       const p = $('#f-period').value;
+      const origin = $('#f-origin').value;
       return orders.filter(o => {
         if (st && o.status !== st) return false;
+        if (origin && (o.kind === 'loja') !== (origin === 'loja')) return false;
         if (!in_period(o, p)) return false;
         if (!q) return true;
-        const text = [o.id, o.client_name, o.client_email, o.product_name].join(' ').toLowerCase();
+        const text = [o.id, o.client_name, o.client_email, o.product_name, o.address, items_text(o)].join(' ').toLowerCase();
         const digits = [o.client_phone, o.client_document].join(' ').replace(/\D/g, '');
         return text.includes(q) || (qd.length >= 3 && digits.includes(qd));
       });
@@ -493,7 +501,7 @@
           <div class="o-main">
             <div class="o-top">
               <span class="badge-status ${s.cls}">${s.label}</span>
-              <span class="kind-tag">${o.kind === 'manual' ? 'Pix manual' : 'Pix automático'}</span>
+              <span class="kind-tag ${o.kind === 'loja' ? 'kind-loja' : ''}">${kind_label(o)}</span>
               ${o.coupon ? `<span class="kind-tag coupon-admin" title="O cliente deve pagar pelo app deste banco">Cupom ${esc(COUPONS[o.coupon] || o.coupon)}</span>` : ''}
               <span class="o-code" title="${esc(o.id)}">#${short(o.id)}</span>
             </div>
@@ -510,7 +518,7 @@
             ${wa ? `<a class="act act-wa" href="${wa}" target="_blank">WhatsApp</a>` : ''}
             ${pay_btn}
             <button class="act" onclick="open_edit('${o.id}')">Editar</button>
-            <button class="act" onclick="duplicate('${o.id}')">Duplicar</button>
+            ${o.kind === 'loja' ? '' : `<button class="act" onclick="duplicate('${o.id}')">Duplicar</button>`}
             <button class="act act-del" onclick="remove('${o.id}')" title="Excluir">Excluir</button>
           </div>
           <details class="o-details">
@@ -518,6 +526,11 @@
             <dl>
               <dt>Código</dt><dd>${esc(o.id)}</dd>
               <dt>E-mail</dt><dd>${esc(o.client_email || '—')}</dd>
+              ${o.address ? `<dt>Entrega</dt><dd>${esc(o.address)}</dd>` : ''}
+              ${o.kind === 'loja' ? `<dt>Frete</dt><dd>${o.shipping_cents ? brl(o.shipping_cents) : 'Grátis'}</dd>` : ''}
+              ${o.store_coupon ? `<dt>Cupom da loja</dt><dd>${esc(o.store_coupon)}</dd>` : ''}
+              ${o.kind === 'loja' && o.discount_cents ? `<dt>Descontos</dt><dd>${brl(o.discount_cents)}${o.product_description ? ' (' + esc(o.product_description) + ')' : ''}</dd>` : ''}
+              ${o.notes ? `<dt>Observações</dt><dd>${esc(o.notes)}</dd>` : ''}
               <dt>CPF/CNPJ</dt><dd>${esc(o.client_document || '—')}</dd>
               ${o.coupon ? `<dt>Cupom</dt><dd>${esc(COUPONS[o.coupon] || o.coupon)}: ${brl(o.subtotal_cents)} − ${brl(o.discount_cents)}. Confira no extrato se o Pix veio deste banco.</dd>` : ''}
               <dt>Itens escolhidos</dt><dd>${esc(items || 'O cliente ainda não confirmou.')}</dd>
@@ -529,7 +542,7 @@
         </article>`;
       }).join('');
     }
-    ['f-search', 'f-status', 'f-period'].forEach(id => document.getElementById(id).addEventListener('input', render));
+    ['f-search', 'f-status', 'f-origin', 'f-period'].forEach(id => document.getElementById(id).addEventListener('input', render));
 
     const find = (id) => orders.find(o => o.id === id);
 
@@ -574,6 +587,9 @@
       f.elements.amount_reais.value = manual ? cents_to_input(o.total_cents) : '';
       f.elements.payment_link.value = manual ? (o.payment_link || '') : '';
       $('#edit-note').textContent = o.status === 'draft' ? '' : 'O cliente já confirmou este pedido. Mudar as categorias não altera o Pix que já foi gerado.';
+      const loja = o.kind === 'loja';
+      f.querySelectorAll('.edit-cats').forEach(el => el.hidden = loja);
+      if (loja) $('#edit-note').textContent = 'Pedido feito na loja: os itens e o valor vêm do carrinho do cliente e não podem ser editados aqui.';
       $('#edit-categories').innerHTML = '';
       (o.available_categories || []).forEach(c => add_category('edit-categories', c));
       $('#edit-error').textContent = '';
@@ -585,7 +601,9 @@
       const f = e.target; const err = $('#edit-error'); err.textContent = '';
       const body = {};
       for (const k of ['client_name', 'client_phone', 'client_email', 'client_document', 'product_name', 'product_description', 'status']) body[k] = f.elements[k].value;
-      try { body.available_categories = read_categories('edit-categories'); } catch (ex) { err.textContent = ex.message; return; }
+      if (editing.kind !== 'loja') {
+        try { body.available_categories = read_categories('edit-categories'); } catch (ex) { err.textContent = ex.message; return; }
+      }
       if (editing.kind === 'manual') {
         body.total_cents = to_cents(f.elements.amount_reais.value);
         if (!(body.total_cents > 0)) { err.textContent = 'Informe o valor total.'; return; }
@@ -601,12 +619,13 @@
     function export_csv() {
       const list = filtered();
       if (!list.length) return toast('Nenhum pedido para exportar.', true);
-      const head = ['Código', 'Criado em', 'Cliente', 'E-mail', 'CPF/CNPJ', 'Telefone', 'Produto', 'Tipo', 'Situação', 'Valor (R$)', 'Cupom', 'Desconto (R$)', 'Itens', 'Pago em'];
+      const head = ['Código', 'Criado em', 'Cliente', 'E-mail', 'CPF/CNPJ', 'Telefone', 'Produto', 'Tipo', 'Situação', 'Valor (R$)', 'Cupom', 'Desconto (R$)', 'Itens', 'Endereço', 'Frete (R$)', 'Observações', 'Pago em'];
       const rows = list.map(o => [
         o.id, fmt_date(o.created_at), o.client_name, o.client_email, o.client_document, o.client_phone, o.product_name,
-        o.kind === 'manual' ? 'Pix manual' : 'Pix automático', (STATUS[o.status] || {}).label || o.status,
+        kind_label(o), (STATUS[o.status] || {}).label || o.status,
         o.total_cents ? cents_to_input(o.total_cents) : '', o.coupon ? (COUPONS[o.coupon] || o.coupon) : '',
-        o.discount_cents ? cents_to_input(o.discount_cents) : '', items_text(o), o.paid_at ? fmt_date(o.paid_at) : ''
+        o.discount_cents ? cents_to_input(o.discount_cents) : '', items_text(o),
+        o.address || '', o.kind === 'loja' ? cents_to_input(o.shipping_cents) : '', o.notes || '', o.paid_at ? fmt_date(o.paid_at) : ''
       ]);
       const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
       const csv = '﻿' + [head, ...rows].map(r => r.map(cell).join(';')).join('\r\n');
