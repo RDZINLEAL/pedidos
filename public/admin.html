@@ -225,6 +225,7 @@
       paid: { label: 'Pago', cls: 'status-paid' },
       rejected: { label: 'Recusado', cls: 'status-rejected' }
     };
+    const COUPONS = { caixa: 'Caixa / Caixa Tem', sicredi: 'Sicredi' };
     let orders = [];
     let editing = null;
 
@@ -493,6 +494,7 @@
             <div class="o-top">
               <span class="badge-status ${s.cls}">${s.label}</span>
               <span class="kind-tag">${o.kind === 'manual' ? 'Pix manual' : 'Pix automático'}</span>
+              ${o.coupon ? `<span class="kind-tag coupon-admin" title="O cliente deve pagar pelo app deste banco">Cupom ${esc(COUPONS[o.coupon] || o.coupon)}</span>` : ''}
               <span class="o-code" title="${esc(o.id)}">#${short(o.id)}</span>
             </div>
             <strong class="o-name">${esc(o.client_name || 'Sem nome')}</strong>
@@ -517,6 +519,7 @@
               <dt>Código</dt><dd>${esc(o.id)}</dd>
               <dt>E-mail</dt><dd>${esc(o.client_email || '—')}</dd>
               <dt>CPF/CNPJ</dt><dd>${esc(o.client_document || '—')}</dd>
+              ${o.coupon ? `<dt>Cupom</dt><dd>${esc(COUPONS[o.coupon] || o.coupon)}: ${brl(o.subtotal_cents)} − ${brl(o.discount_cents)}. Confira no extrato se o Pix veio deste banco.</dd>` : ''}
               <dt>Itens escolhidos</dt><dd>${esc(items || 'O cliente ainda não confirmou.')}</dd>
               <dt>Fotos</dt><dd>${(o.photos || []).length}</dd>
               <dt>Pago em</dt><dd>${o.paid_at ? fmt_date(o.paid_at) + (o.paid_by === 'painel' ? ' (marcado no painel)' : o.paid_by === 'webhook' ? ' (PinguPag)' : '') : '—'}</dd>
@@ -598,11 +601,12 @@
     function export_csv() {
       const list = filtered();
       if (!list.length) return toast('Nenhum pedido para exportar.', true);
-      const head = ['Código', 'Criado em', 'Cliente', 'E-mail', 'CPF/CNPJ', 'Telefone', 'Produto', 'Tipo', 'Situação', 'Valor (R$)', 'Itens', 'Pago em'];
+      const head = ['Código', 'Criado em', 'Cliente', 'E-mail', 'CPF/CNPJ', 'Telefone', 'Produto', 'Tipo', 'Situação', 'Valor (R$)', 'Cupom', 'Desconto (R$)', 'Itens', 'Pago em'];
       const rows = list.map(o => [
         o.id, fmt_date(o.created_at), o.client_name, o.client_email, o.client_document, o.client_phone, o.product_name,
         o.kind === 'manual' ? 'Pix manual' : 'Pix automático', (STATUS[o.status] || {}).label || o.status,
-        o.total_cents ? cents_to_input(o.total_cents) : '', items_text(o), o.paid_at ? fmt_date(o.paid_at) : ''
+        o.total_cents ? cents_to_input(o.total_cents) : '', o.coupon ? (COUPONS[o.coupon] || o.coupon) : '',
+        o.discount_cents ? cents_to_input(o.discount_cents) : '', items_text(o), o.paid_at ? fmt_date(o.paid_at) : ''
       ]);
       const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
       const csv = '﻿' + [head, ...rows].map(r => r.map(cell).join(';')).join('\r\n');

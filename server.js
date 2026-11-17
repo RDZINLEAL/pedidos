@@ -33,6 +33,14 @@ const webhook_secret = process.env.WEBHOOK_SECRET
   || createHash('sha256').update('bravus-webhook:' + process.env.MONGODB_URI).digest('hex');
 const sign = (order_id) => createHmac('sha256', webhook_secret).update(String(order_id)).digest('hex').slice(0, 32);
 
+// Promoção de parcerias: desconto para quem paga o Pix pelo banco escolhido.
+// Para desligar, troque active para false.
+const PROMO = {
+  active: true,
+  percent: 15,
+  banks: { caixa: 'Caixa / Caixa Tem', sicredi: 'Sicredi' }
+};
+
 const order_kind = (o) => o.kind || (typeof o.qr_image === 'string' && o.qr_image.startsWith('/uploads/') ? 'manual' : 'auto');
 
 // O que o cliente pode ver: sem CPF, telefone, e-mail nem ID da transação.
@@ -49,6 +57,12 @@ function public_order(o) {
     available_categories: o.available_categories || [],
     selected_sizes: o.selected_sizes || [],
     total_cents: o.total_cents || 0,
+    coupon: o.coupon || null,
+    coupon_bank: o.coupon ? PROMO.banks[o.coupon] || o.coupon : null,
+    subtotal_cents: o.subtotal_cents || null,
+    discount_cents: o.discount_cents || 0,
+    // A promoção só vale para o Pix automático: o Pix manual já tem o valor fixo no QR do banco.
+    promo: PROMO.active && order_kind(o) === 'auto' ? PROMO : null,
     payment_link: show_pix ? o.payment_link : null,
     qr_image: show_pix ? o.qr_image : null,
     expires_at: o.expires_at || null,
@@ -272,8 +286,12 @@ app.post('/api/orders/:id/checkout', wrap(async (req, res) => {
   if (order_kind(order) === 'manual') return res.status(400).json({ error: 'Este pedido usa Pix manual.' });
   if (order.status === 'paid') return res.status(400).json({ error: 'Este pedido já foi pago.' });
 
-  const { selected_sizes, total_cents } = parse_selection(order, (req.body || {}).selected_sizes);
-  if (total_cents === 0) return res.status(400).json({ error: 'Selecione pelo menos um item.' });
+  const { selected_sizes, total_cents: subtotal_cents } = parse_selection(order, (req.body || {}).selected_sizes);
+  if (subtotal_cents === 0) return res.status(400).json({ error: 'Selecione pelo menos um item.' });
+
+  const coupon = PROMO.active && PROMO.banks[(req.body || {}).coupon] ? req.body.coupon : null;
+  const discount_cents = coupon ? Math.round(subtotal_cents * PROMO.percent / 100) : 0;
+  const total_cents = subtotal_cents - discount_cents;
 
   const postback_url = `${base}/api/webhook/pingupag?sig=${sign(order.id)}`;
   const tx = await create_transaction({ ...order, total_cents, postback_url }, base);
@@ -281,6 +299,9 @@ app.post('/api/orders/:id/checkout', wrap(async (req, res) => {
   await update_order(order.id, {
     selected_sizes,
     total_cents,
+    subtotal_cents,
+    discount_cents,
+    coupon,
     status: 'pending',
     payment_link: tx.payment_link,
     qr_image: tx.qr_image,

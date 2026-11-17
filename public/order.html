@@ -43,6 +43,29 @@
         </div>
       </div>
     </div>
+    <!-- Pop-up da promoção de parcerias -->
+    <div class="modal-overlay" id="modal-promo">
+      <div class="modal-box promo-box">
+        <button class="promo-close" onclick="skip_promo()" aria-label="Fechar">×</button>
+        <img src="/assets/promo-parcerias.webp" alt="A Bravus agora tem parcerias: Caixa e Sicredi" class="promo-img">
+        <div id="promo-step-1">
+          <h3><span class="yellow-text" id="promo-pct">15%</span> de desconto no seu pedido!</h3>
+          <p>A Bravus agora tem parceria com a <b>Caixa / Caixa Tem</b> e o <b>Sicredi</b>. Pagando o Pix por um desses bancos, você ganha <b id="promo-pct-2">15%</b> de desconto. Por qual banco você quer pagar?</p>
+          <div class="promo-banks">
+            <button class="bank-btn bank-caixa" onclick="pick_bank('caixa')">Caixa / Caixa Tem</button>
+            <button class="bank-btn bank-sicredi" onclick="pick_bank('sicredi')">Sicredi</button>
+          </div>
+          <button class="promo-skip" onclick="skip_promo()">Continuar sem o cupom</button>
+        </div>
+        <div id="promo-step-2" hidden>
+          <h3>Quase lá!</h3>
+          <p>Para garantir os <b id="promo-pct-3">15%</b> de desconto, o pagamento do Pix precisa ser feito pelo app <b id="promo-bank-name"></b>.</p>
+          <div class="promo-preview" id="promo-preview"></div>
+          <button class="btn-confirm promo-apply" onclick="apply_coupon()">Aplicar meu cupom</button>
+          <button class="promo-skip" onclick="promo_step(1)">Voltar e escolher outro banco</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="toast" id="toast"></div>
@@ -55,6 +78,13 @@
     let selection = {};
     let poll = null;
     let timer = null;
+    let promo_timer = null;
+    let picked_bank = null;
+    // Escolha do cupom fica salva neste aparelho para este pedido: 'caixa', 'sicredi' ou 'none'
+    const PROMO_KEY = 'bravus-cupom-' + id;
+    const load_choice = () => { try { return localStorage.getItem(PROMO_KEY); } catch { return null; } };
+    const save_choice = (v) => { try { localStorage.setItem(PROMO_KEY, v); } catch {} };
+    let coupon = null;
 
     const $ = (s) => document.querySelector(s);
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -133,7 +163,9 @@
         <div class="order-summary">
           <h2>Resumo do pedido</h2>
           <div id="summary-lines"></div>
+          <div id="discount-lines"></div>
         </div>
+        <div id="promo-strip"></div>
 
         <div class="sticky-bar">
           <div class="sticky-info">
@@ -146,7 +178,68 @@
 
       document.querySelectorAll('.counter button').forEach(b => b.addEventListener('click', () => change(+b.dataset.ci, b.dataset.size, +b.dataset.d)));
       if (photos.length > 1) setup_carousel();
+
+      // Promoção: recupera a escolha salva ou abre o pop-up 3 segundos depois
+      const saved = load_choice();
+      coupon = order.promo && order.promo.banks[saved] ? saved : null;
       update_total();
+      clearTimeout(promo_timer);
+      if (order.promo && !saved) {
+        promo_timer = setTimeout(() => {
+          const busy = [...document.querySelectorAll('.modal-overlay')].some(m => m.style.display === 'flex');
+          if (order.status === 'draft' && $('#categories-wrapper') && !busy) open_promo();
+        }, 3000);
+      }
+    }
+
+    /* ---------- Promoção de parcerias ---------- */
+    const pct = () => order.promo ? order.promo.percent : 0;
+    const bank_name = (b) => (order.promo && order.promo.banks[b]) || b;
+    const discount_of = (subtotal) => coupon ? Math.round(subtotal * pct() / 100) : 0;
+
+    function open_promo() {
+      ['#promo-pct', '#promo-pct-2', '#promo-pct-3'].forEach(s => $(s).textContent = pct() + '%');
+      promo_step(1);
+      $('#modal-promo').style.display = 'flex';
+    }
+    function promo_step(n) {
+      $('#promo-step-1').hidden = n !== 1;
+      $('#promo-step-2').hidden = n !== 2;
+    }
+    function pick_bank(bank) {
+      picked_bank = bank;
+      $('#promo-bank-name').textContent = bank === 'caixa' ? 'da Caixa ou do Caixa Tem' : 'do Sicredi';
+      const sub = summary_rows().reduce((a, r) => a + r.cents, 0);
+      const off = Math.round(sub * pct() / 100);
+      $('#promo-preview').innerHTML = sub
+        ? `<div><span>Valor do pedido</span><s>${brl(sub)}</s></div><div><span>Com o cupom</span><strong class="yellow-text">${brl(sub - off)}</strong></div>`
+        : '';
+      promo_step(2);
+    }
+    function apply_coupon() {
+      coupon = picked_bank; save_choice(coupon);
+      $('#modal-promo').style.display = 'none';
+      update_total();
+      toast(`Cupom ${bank_name(coupon)} aplicado: ${pct()}% de desconto!`);
+      $('#discount-lines').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    function skip_promo() {
+      if (!coupon) save_choice('none');
+      $('#modal-promo').style.display = 'none';
+      update_total();
+    }
+    function remove_coupon() { coupon = null; save_choice('none'); update_total(); }
+
+    function discount_html(sub) {
+      if (!coupon || !sub) return '';
+      return `<div class="summary-line discount-line"><div><strong>Subtotal</strong></div><b>${brl(sub)}</b></div>
+        <div class="summary-line discount-line"><div><strong class="green">Cupom ${esc(bank_name(coupon))} (−${pct()}%)</strong><span>Pague o Pix pelo app ${coupon === 'caixa' ? 'da Caixa ou do Caixa Tem' : 'do Sicredi'}</span></div><b class="green">−${brl(discount_of(sub))}</b></div>`;
+    }
+
+    function promo_strip_html() {
+      if (!order.promo) return '';
+      if (coupon) return `<div class="promo-strip on">🎉 Cupom <b>${esc(bank_name(coupon))}</b> aplicado <button onclick="open_promo()">Trocar</button><button onclick="remove_coupon()">Remover</button></div>`;
+      return `<button class="promo-strip" onclick="open_promo()">🎁 <span><b>${pct()}% OFF</b> pagando com Caixa ou Sicredi</span> <u>Ver promoção</u></button>`;
     }
 
     function counter_html(ci, size, qty) {
@@ -192,7 +285,11 @@
     }
 
     // Pix manual: o valor é o combinado com a loja, não a soma das categorias.
-    const total_cents = (rows) => is_manual() ? order.total_cents : rows.reduce((a, r) => a + r.cents, 0);
+    const total_cents = (rows) => {
+      if (is_manual()) return order.total_cents;
+      const sub = rows.reduce((a, r) => a + r.cents, 0);
+      return sub - discount_of(sub);
+    };
 
     function rows_html(rows) {
       if (!rows.length) return '<p class="summary-empty">Nenhuma peça selecionada.</p>';
@@ -205,6 +302,8 @@
       const rows = summary_rows();
       const qty = rows.reduce((a, r) => a + r.qty, 0);
       $('#summary-lines').innerHTML = rows_html(rows);
+      $('#discount-lines').innerHTML = is_manual() ? '' : discount_html(rows.reduce((a, r) => a + r.cents, 0));
+      $('#promo-strip').innerHTML = promo_strip_html();
       $('#total-qty').textContent = `${qty} ${qty === 1 ? 'peça' : 'peças'}`;
       $('#total-price').textContent = brl(total_cents(rows));
       $('#btn-confirm').disabled = qty === 0;
@@ -228,9 +327,11 @@
     function open_review() {
       const rows = summary_rows();
       if (!rows.length) return;
-      $('#review-lines').innerHTML = rows_html(rows);
+      $('#review-lines').innerHTML = rows_html(rows) + (is_manual() ? '' : discount_html(rows.reduce((a, r) => a + r.cents, 0)));
       $('#review-total').textContent = brl(total_cents(rows));
-      $('#review-text').textContent = 'Revise os itens abaixo. Depois de confirmar, mostramos o Pix para pagamento.';
+      $('#review-text').textContent = coupon
+        ? `Revise os itens abaixo. Lembre-se: para ter o desconto, pague o Pix pelo app ${coupon === 'caixa' ? 'da Caixa ou do Caixa Tem' : 'do Sicredi'}.`
+        : 'Revise os itens abaixo. Depois de confirmar, mostramos o Pix para pagamento.';
       $('#review-ok').textContent = 'Confirmar e ver o Pix';
       $('#modal-review').style.display = 'flex';
     }
@@ -239,7 +340,7 @@
     async function submit_order() {
       const btn = $('#review-ok');
       btn.disabled = true; btn.textContent = 'Gerando Pix...';
-      const payload = { selected_sizes: Object.keys(selection).map(cat => ({ category: cat, sizes: selection[cat] })) };
+      const payload = { selected_sizes: Object.keys(selection).map(cat => ({ category: cat, sizes: selection[cat] })), coupon };
       const url = is_manual() ? `/api/manual-orders/${id}/confirm` : `/api/orders/${id}/checkout`;
       try {
         const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -271,6 +372,7 @@
 
     function show_payment() {
       const manual = is_manual();
+      const bank_app = order.coupon === 'caixa' ? 'da Caixa ou do Caixa Tem' : order.coupon === 'sicredi' ? 'do Sicredi' : '';
       $('#app-content').innerHTML = `
         <ol class="steps">
           <li class="done"><b>✓</b>Confirmação</li>
@@ -281,13 +383,17 @@
         <div class="card payment-card">
           <div class="pay-total">
             <span>Total a pagar</span>
+            ${order.discount_cents ? `<s class="old-price">${brl(order.subtotal_cents)}</s>` : ''}
             <strong class="yellow-text">${brl(order.total_cents)}</strong>
+            ${order.discount_cents ? `<span class="coupon-tag">Cupom ${esc(order.coupon_bank)} · −${brl(order.discount_cents)}</span>` : ''}
             ${manual ? `<div class="timer" id="timer">--:--</div>` : ''}
           </div>
 
+          ${bank_app ? `<div class="bank-notice">⚠️ Pague pelo app <b>${bank_app}</b> para garantir o seu desconto.</div>` : ''}
+
           <div class="pix-steps">
             <div><b>1</b><span>Toque em <strong>Copiar código Pix</strong></span></div>
-            <div><b>2</b><span>Abra o app do seu banco e escolha <strong>Pix copia e cola</strong></span></div>
+            <div><b>2</b><span>Abra o app ${bank_app ? `<strong>${bank_app}</strong>` : 'do seu banco'} e escolha <strong>Pix copia e cola</strong></span></div>
             <div><b>3</b><span>Cole o código e confirme. Esta página atualiza sozinha.</span></div>
           </div>
 

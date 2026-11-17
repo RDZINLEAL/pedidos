@@ -32,6 +32,9 @@ const OrderSchema = new mongoose.Schema({
   selected_sizes: Array,
 
   total_cents: Number,
+  coupon: String,          // 'caixa' ou 'sicredi' (promoção de parcerias)
+  subtotal_cents: Number,  // total antes do desconto
+  discount_cents: Number,
   created_at: { type: Date, default: Date.now },
   paid_at: Date
 });

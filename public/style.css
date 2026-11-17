@@ -303,6 +303,7 @@ body.dark-theme {
 .act-wa { color: #4ade80; }
 .act-del { color: #f87171; margin-left: auto; }
 .act-del:hover { background: rgba(239,68,68,.15); color: #fca5a5; }
+.coupon-admin { color: #4ade80; border-color: rgba(34,197,94,.5); }
 .status-rejected { background: #fecaca; color: #991b1b; }
 .o-details { grid-column: 1 / -1; font-size: 13px; }
 .o-details summary { cursor: pointer; color: #a1a1aa; font-size: 12px; }
@@ -431,4 +432,37 @@ a.support-footer { text-decoration: none; }
 .state-card h2 { font-size: 22px; margin-bottom: 8px; }
 .state-card p { color: #aaa; font-size: 14px; margin-bottom: 14px; }
 .state-card .order-items-container { text-align: left; max-width: 300px; margin: 0 auto 12px; }
+/* Promoção de parcerias */
+.promo-box { position: relative; max-width: 400px; width: 92%; padding: 0 0 20px; overflow: hidden; border-color: #facc15; max-height: 92vh; overflow-y: auto; animation: pop .25s ease-out; }
+@keyframes pop { from { transform: scale(.92); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .promo-box { animation: none; } }
+.promo-img { display: block; width: 100%; height: auto; }
+.promo-box h3 { font-size: 20px; margin: 16px 18px 8px; line-height: 1.25; }
+.promo-box p { margin: 0 18px 16px; font-size: 14px; line-height: 1.5; color: #ccc; }
+.promo-box p b { color: #fff; }
+.promo-close { position: absolute; top: 8px; right: 8px; width: 34px; height: 34px; border-radius: 50%; border: none; background: rgba(0,0,0,.7); color: #fff; font-size: 22px; line-height: 1; z-index: 2; }
+.promo-banks { display: flex; flex-direction: column; gap: 10px; margin: 0 18px; }
+.bank-btn { padding: 16px; border-radius: 12px; font-size: 16px; font-weight: 900; border: 2px solid transparent; }
+.bank-caixa { background: #f7931e; color: #fff; }
+.bank-caixa:hover { border-color: #fff; }
+.bank-sicredi { background: #3fa110; color: #fff; }
+.bank-sicredi:hover { border-color: #fff; }
+.promo-skip { display: block; margin: 14px auto 0; background: none; border: none; color: #999; font-size: 14px; text-decoration: underline; padding: 6px; }
+.promo-preview { margin: 0 18px 16px; padding: 12px 14px; border-radius: 10px; background: #1a1a1a; border: 1px solid #333; display: flex; flex-direction: column; gap: 6px; text-align: left; }
+.promo-preview:empty { display: none; }
+.promo-preview div { display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: #aaa; }
+.promo-preview s { color: #888; }
+.promo-preview strong { font-size: 20px; }
+.btn-confirm.promo-apply { width: calc(100% - 36px); margin: 0 18px; }
+.green { color: #4ade80 !important; }
+.discount-line strong { font-size: 13px; }
+.promo-strip { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: calc(100% - 30px); margin: -8px 15px 14px; padding: 12px 14px; border-radius: 12px; border: 1px dashed #facc15; background: rgba(250,204,21,.08); color: #fff; font-size: 14px; text-align: left; }
+.promo-strip u { margin-left: auto; color: #facc15; font-weight: 700; }
+.promo-strip.on { border-style: solid; border-color: #22c55e; background: rgba(34,197,94,.1); }
+.promo-strip.on button { background: none; border: none; color: #facc15; font-weight: 700; text-decoration: underline; font-size: 13px; padding: 2px 4px; }
+.promo-strip.on button:first-of-type { margin-left: auto; }
+.old-price { display: block; color: #888; font-size: 15px; }
+.coupon-tag { display: inline-block !important; margin-top: 6px; font-size: 12px !important; font-weight: 700; color: #4ade80 !important; background: rgba(34,197,94,.12); padding: 4px 10px; border-radius: 99px; }
+.bank-notice { margin-bottom: 16px; padding: 12px 14px; border-radius: 10px; background: rgba(250,204,21,.1); border: 1px solid rgba(250,204,21,.5); font-size: 14px; color: #fff; }
+
 .state-card .check { width: 64px; height: 64px; margin: 0 auto 14px; border-radius: 50%; background: #22c55e; color: #000; font-size: 34px; font-weight: 900; display: flex; align-items: center; justify-content: center; }
