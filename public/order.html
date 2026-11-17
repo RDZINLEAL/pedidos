@@ -46,7 +46,7 @@
     <!-- Pop-up da promoção de parcerias -->
     <div class="modal-overlay" id="modal-promo">
       <div class="modal-box promo-box">
-        <button class="promo-close" onclick="skip_promo()" aria-label="Fechar">×</button>
+        <button class="promo-close" onclick="ask_skip()" aria-label="Fechar">×</button>
         <img src="/assets/promo-parcerias.webp" alt="A Bravus agora tem parcerias: Caixa e Sicredi" class="promo-img">
         <div id="promo-step-1">
           <h3><span class="yellow-text" id="promo-pct">15%</span> de desconto no seu pedido!</h3>
@@ -55,6 +55,14 @@
             <button class="bank-btn bank-caixa" onclick="pick_bank('caixa')">Caixa / Caixa Tem</button>
             <button class="bank-btn bank-sicredi" onclick="pick_bank('sicredi')">Sicredi</button>
           </div>
+          <button class="promo-skip" onclick="ask_skip()">Continuar sem o cupom</button>
+        </div>
+        <!-- Confirmação antes de recusar a oferta -->
+        <div id="promo-step-3" hidden>
+          <h3>Tem certeza?</h3>
+          <p id="promo-loss">Sem o cupom, você deixa de economizar <b>15%</b> neste pedido.</p>
+          <p class="promo-hint">Basta pagar o Pix pelo app da <b>Caixa / Caixa Tem</b> ou do <b>Sicredi</b>. É o mesmo Pix de sempre.</p>
+          <button class="btn-confirm promo-apply" onclick="promo_step(1)">Quero meu desconto</button>
           <button class="promo-skip" onclick="skip_promo()">Continuar sem o cupom</button>
         </div>
         <div id="promo-step-2" hidden>
@@ -189,7 +197,7 @@
         promo_timer = setTimeout(() => {
           const busy = [...document.querySelectorAll('.modal-overlay')].some(m => m.style.display === 'flex');
           if (order.status === 'draft' && $('#categories-wrapper') && !busy) open_promo();
-        }, 3000);
+        }, 1000);
       }
     }
 
@@ -206,6 +214,17 @@
     function promo_step(n) {
       $('#promo-step-1').hidden = n !== 1;
       $('#promo-step-2').hidden = n !== 2;
+      $('#promo-step-3').hidden = n !== 3;
+    }
+    // Antes de recusar, mostra quanto o cliente deixaria de economizar
+    function ask_skip() {
+      if (coupon) return skip_promo(); // já tem cupom: só fecha
+      const sub = summary_rows().reduce((a, r) => a + r.cents, 0);
+      const off = Math.round(sub * pct() / 100);
+      $('#promo-loss').innerHTML = off
+        ? `Sem o cupom, você deixa de economizar <b class="yellow-text">${brl(off)}</b> (${pct()}%) neste pedido.`
+        : `Sem o cupom, você deixa de economizar <b class="yellow-text">${pct()}%</b> neste pedido.`;
+      promo_step(3);
     }
     function pick_bank(bank) {
       picked_bank = bank;
